@@ -1,0 +1,7 @@
+{
+    "filename": "docs/Task10_11_Testing_and_Documentation.docx",
+    "title": "Task 10 & 11: Testing and Final Documentation",
+    "objective": "The objective of these tasks is to ensure the reliability of the transport modules and metrics calculations through unit testing, and to wrap up the project with comprehensive documentation as requested.",
+    "what_done": "I wrote a test suite in 'tests/test_member2.py' using Python's built-in 'unittest' framework. It includes tests for the TCP connection module (testing both successful connections and timeouts) and the metrics engine (verifying rolling statistics and jitter logic). The tests act as proof that the underlying network functions work correctly. I also implemented an automated script 'create_doc.py' to generate all the required .docx documentation files in the 'docs' directory for each task.",
+    "result": "The core transport and analytics logic developed by Member 2 is now thoroughly tested and verified. The complete workflow is accompanied by professional .docx documentation for every task, fulfilling the academic and technical requirements for a highly impressive, resume-worthy project."
+}
