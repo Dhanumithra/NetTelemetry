@@ -1,0 +1,18 @@
+{
+    "targets": [
+        {
+            "name": "Localhost",
+            "host": "127.0.0.1",
+            "enabled": true,
+            "interval": 5,
+            "timeout": 2
+        },
+        {
+            "name": "Google DNS",
+            "host": "8.8.8.8",
+            "enabled": true,
+            "interval": 5,
+            "timeout": 2
+        }
+    ]
+}
