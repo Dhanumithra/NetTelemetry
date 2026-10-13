@@ -69,8 +69,8 @@ def get_brand_icon(name: str) -> str:
 # --- Top Header & Greeting ---
 
 def render_top_header_actions() -> str:
-    return """
-    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 1rem; padding-top: 2px;">
+    html = """
+    <div class="top-header-actions-bar">
         <div class="top-action-btn" title="Light / Dark mode">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="5"></circle>
@@ -100,13 +100,14 @@ def render_top_header_actions() -> str:
         </div>
     </div>
     """
+    return clean_html(html)
 
 def render_hero_greeting() -> str:
     now = datetime.datetime.now()
     formatted_date = now.strftime("%a, %b %d, %Y")
     formatted_time = now.strftime("%I:%M %p")
 
-    return f"""
+    html = f"""
     <div class="hero-greeting-container" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">
         <div>
             <div class="hero-subtitle-tag">NETWORK TELEMETRY</div>
@@ -126,6 +127,7 @@ def render_hero_greeting() -> str:
         </div>
     </div>
     """
+    return clean_html(html)
 
 def render_top_header(search_val: str = "") -> str:
     return render_top_header_actions() + render_hero_greeting()
@@ -171,7 +173,7 @@ def generate_sparkline_svg(color: str, points: List[float], fill: bool = True) -
 
 def render_kpi_card_1(total_targets: int = 5, online: int = 2, offline: int = 0) -> str:
     spark = generate_sparkline_svg("#10b981", [10, 12, 11, 14, 13, 16, 15, 18, 16, 20])
-    return f"""
+    html = f"""
     <div class="kpi-card">
         <div class="kpi-header">
             <div class="kpi-icon-title">
@@ -193,10 +195,11 @@ def render_kpi_card_1(total_targets: int = 5, online: int = 2, offline: int = 0)
         {spark}
     </div>
     """
+    return clean_html(html)
 
 def render_kpi_card_2(avg_rtt: float = 32.0, change_pct: float = -18.0) -> str:
     spark = generate_sparkline_svg("#3b82f6", [38, 35, 36, 34, 35, 33, 31, 32])
-    return f"""
+    html = f"""
     <div class="kpi-card">
         <div class="kpi-header">
             <div class="kpi-icon-title">
@@ -217,10 +220,11 @@ def render_kpi_card_2(avg_rtt: float = 32.0, change_pct: float = -18.0) -> str:
         {spark}
     </div>
     """
+    return clean_html(html)
 
 def render_kpi_card_3(loss_pct: float = 2.4, change_pct: float = -6.0) -> str:
     spark = generate_sparkline_svg("#f59e0b", [4.0, 3.8, 3.2, 3.5, 2.9, 2.7, 2.4])
-    return f"""
+    html = f"""
     <div class="kpi-card">
         <div class="kpi-header">
             <div class="kpi-icon-title">
@@ -242,10 +246,11 @@ def render_kpi_card_3(loss_pct: float = 2.4, change_pct: float = -6.0) -> str:
         {spark}
     </div>
     """
+    return clean_html(html)
 
 def render_kpi_card_4(avail_pct: float = 97.6, change_pct: float = 2.1) -> str:
     spark = generate_sparkline_svg("#8b5cf6", [95.0, 95.8, 96.2, 96.5, 97.1, 97.6])
-    return f"""
+    html = f"""
     <div class="kpi-card">
         <div class="kpi-header">
             <div class="kpi-icon-title">
@@ -265,6 +270,7 @@ def render_kpi_card_4(avail_pct: float = 97.6, change_pct: float = 2.1) -> str:
         {spark}
     </div>
     """
+    return clean_html(html)
 
 # --- Network Topology Map ---
 
@@ -491,10 +497,17 @@ def create_availability_donut_figure(avail_pct: float = 97.6, successful: int = 
 
     return fig
 
+import textwrap
+
+def clean_html(text: str) -> str:
+    """Removes all leading indentation so markdown parsers never mistake HTML for code blocks."""
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
+
 # --- Bottom Grid: Top Targets by Latency Progress Bars ---
 
 def render_latency_progress_bars(targets: List[Dict[str, Any]]) -> str:
-    rows_html = ""
+    rows = []
     max_ms = 60.0
 
     for t in targets:
@@ -503,24 +516,20 @@ def render_latency_progress_bars(targets: List[Dict[str, Any]]) -> str:
         pct = min(100.0, (rtt / max_ms) * 100) if max_ms > 0 else 0
         icon = get_brand_icon(name)
 
-        rows_html += f"""
-        <div class="latency-bar-row">
-            <div class="latency-logo-group">
-                {icon}
-                <span class="latency-host-title">{name}</span>
-            </div>
-            <div class="latency-track">
-                <div class="latency-fill" style="width: {pct:.1f}%;"></div>
-            </div>
-            <span class="latency-value-tag">{int(round(rtt))} ms</span>
-        </div>
-        """
-    return rows_html
+        row = (
+            f'<div class="latency-bar-row">'
+            f'<div class="latency-logo-group">{icon}<span class="latency-host-title">{name}</span></div>'
+            f'<div class="latency-track"><div class="latency-fill" style="width: {pct:.1f}%;"></div></div>'
+            f'<span class="latency-value-tag">{int(round(rtt))} ms</span>'
+            f'</div>'
+        )
+        rows.append(row)
+    return clean_html("\n".join(rows))
 
 # --- Column 2: Live Target Status Card ---
 
 def render_live_target_status_list(targets: List[Dict[str, Any]]) -> str:
-    rows_html = ""
+    rows = []
     for t in targets:
         name = t.get("name", "Host")
         ip = t.get("resolved_ip") or t.get("host")
@@ -530,40 +539,31 @@ def render_live_target_status_list(targets: List[Dict[str, Any]]) -> str:
         badge_cls = "badge-online" if status == "Online" else ("badge-degraded" if status == "Degraded" else "badge-offline")
         icon = get_brand_icon(name)
 
-        rows_html += f"""
-        <div class="target-status-row">
-            <div class="target-info-group">
-                <div class="brand-logo-img">{icon}</div>
-                <div class="target-name-ip">
-                    <span class="target-name">{name}</span>
-                    <span class="target-ip">{ip}</span>
-                </div>
-            </div>
-            <div class="target-metric-capsule">
-                <div class="metric-label-val">
-                    <span class="metric-lbl">RTT</span>
-                    <span class="metric-v">{int(round(rtt))} ms</span>
-                </div>
-                <div class="metric-label-val">
-                    <span class="metric-lbl">Loss</span>
-                    <span class="metric-v">{loss:.1f}%</span>
-                </div>
-                <span class="badge-status {badge_cls}">{status}</span>
-            </div>
-        </div>
-        """
-    return rows_html
+        row = (
+            f'<div class="target-status-row">'
+            f'<div class="target-info-group">'
+            f'<div class="brand-logo-img">{icon}</div>'
+            f'<div class="target-name-ip"><span class="target-name">{name}</span><span class="target-ip">{ip}</span></div>'
+            f'</div>'
+            f'<div class="target-metric-capsule">'
+            f'<div class="metric-label-val"><span class="metric-lbl">RTT</span><span class="metric-v">{int(round(rtt))} ms</span></div>'
+            f'<div class="metric-label-val"><span class="metric-lbl">Loss</span><span class="metric-v">{loss:.1f}%</span></div>'
+            f'<span class="badge-status {badge_cls}">{status}</span>'
+            f'</div>'
+            f'</div>'
+        )
+        rows.append(row)
+    return clean_html("\n".join(rows))
 
 # --- Column 2: Active Alerts Card ---
 
 def render_active_alerts_list(anomalies: List[Dict[str, Any]]) -> str:
-    rows_html = ""
+    rows = []
     for a in anomalies:
         name = a.get("name") or a.get("target_id") or "Target"
         host = a.get("host") or ""
         reason = a.get("reason", "Network issue detected")
         ts = a.get("timestamp", "")
-        # Format time to e.g. 11:37 AM
         try:
             dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
             time_str = dt.strftime("%I:%M %p")
@@ -575,24 +575,22 @@ def render_active_alerts_list(anomalies: List[Dict[str, Any]]) -> str:
         dot_cls = "alert-dot-critical" if is_critical else "alert-dot-warning"
         badge_text = "Critical" if is_critical else "Warning"
 
-        rows_html += f"""
-        <div class="alert-item-row">
-            <div class="alert-left-group">
-                <div class="alert-indicator-dot {dot_cls}"></div>
-                <div class="alert-desc-group">
-                    <span class="alert-target-title">{name} ({host})</span>
-                    <span class="alert-meta-reason">{time_str} • {reason}</span>
-                </div>
-            </div>
-            <span class="{badge_cls}">{badge_text}</span>
-        </div>
-        """
-    return rows_html
+        row = (
+            f'<div class="alert-item-row">'
+            f'<div class="alert-left-group">'
+            f'<div class="alert-indicator-dot {dot_cls}"></div>'
+            f'<div class="alert-desc-group"><span class="alert-target-title">{name} ({host})</span><span class="alert-meta-reason">{time_str} • {reason}</span></div>'
+            f'</div>'
+            f'<span class="{badge_cls}">{badge_text}</span>'
+            f'</div>'
+        )
+        rows.append(row)
+    return clean_html("\n".join(rows))
 
 # --- Column 2: Recent Activity Micro Table ---
 
 def render_recent_activity_rows(measurements: List[Dict[str, Any]]) -> str:
-    rows_html = ""
+    rows = []
     for m in measurements:
         ts = m.get("timestamp", "")
         try:
@@ -607,13 +605,14 @@ def render_recent_activity_rows(measurements: List[Dict[str, Any]]) -> str:
         loss = "0.0%" if success else "100.0%"
         dot_color = "#10b981" if success else "#ef4444"
 
-        rows_html += f"""
-        <div class="activity-row">
-            <span class="activity-time">{time_str}</span>
-            <span class="activity-name">{name}</span>
-            <span class="activity-rtt">{int(round(rtt))} ms</span>
-            <span class="activity-loss">{loss}</span>
-            <div class="activity-status-dot" style="background-color: {dot_color};"></div>
-        </div>
-        """
-    return rows_html
+        row = (
+            f'<div class="activity-row">'
+            f'<span class="activity-time">{time_str}</span>'
+            f'<span class="activity-name">{name}</span>'
+            f'<span class="activity-rtt">{int(round(rtt))} ms</span>'
+            f'<span class="activity-loss">{loss}</span>'
+            f'<div class="activity-status-dot" style="background-color: {dot_color};"></div>'
+            f'</div>'
+        )
+        rows.append(row)
+    return clean_html("\n".join(rows))

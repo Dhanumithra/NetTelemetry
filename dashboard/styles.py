@@ -894,5 +894,135 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p
     height: 8px;
     border-radius: 50%;
 }
+
+/* Streamlit Container (border=True) as Modern NOC Card */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #ffffff !important;
+    border: 1px solid rgba(226, 232, 240, 0.85) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -2px rgba(15, 23, 42, 0.02) !important;
+    padding: 1rem 1.15rem !important;
+    margin-bottom: 0.85rem !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    box-shadow: 0 6px 20px -2px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Ensure inner blocks don't add redundant margins */
+[data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"] {
+    gap: 0.5rem !important;
+}
+
+.top-header-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.85rem;
+    padding-top: 2px;
+}
+
+/* Responsiveness Media Queries */
+@media (max-width: 1200px) {
+    .block-container {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }
+}
+
+@media (max-width: 1024px) {
+    /* Top action bar adapts */
+    .top-header-actions-bar {
+        justify-content: flex-start !important;
+        margin-top: 0.25rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* Responsive Horizontal Layout Wraps */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 0.75rem !important;
+    }
+
+    /* Stack main 2 columns (70% and 30%) on tablets & laptops */
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* 4 KPI cards adapt to a neat 2x2 grid on tablets */
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) > div[data-testid="column"] {
+        width: calc(50% - 0.5rem) !important;
+        flex: 1 1 calc(50% - 0.5rem) !important;
+        min-width: calc(50% - 0.5rem) !important;
+        max-width: calc(50% - 0.5rem) !important;
+    }
+
+    .top-navbar-wrapper {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+    }
+
+    .search-bar-box {
+        width: 100% !important;
+    }
+
+    .hero-greeting-container {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.75rem !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .block-container {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+        padding-top: 1rem !important;
+    }
+
+    /* All columns become 100% stacked on mobile phones */
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="column"]:nth-child(4)) > div[data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .top-header-actions-bar {
+        justify-content: space-between !important;
+        width: 100% !important;
+    }
+
+    .user-name-text {
+        display: none !important; /* compact profile avatar on phones */
+    }
+
+    .hero-main-title {
+        font-size: 1.35rem !important;
+    }
+
+    .kpi-value {
+        font-size: 1.45rem !important;
+    }
+
+    .card-title-text {
+        font-size: 0.85rem !important;
+    }
+
+    .target-status-row {
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+
+    .target-metric-capsule {
+        gap: 0.5rem !important;
+        margin-left: auto !important;
+    }
+}
 </style>
 """

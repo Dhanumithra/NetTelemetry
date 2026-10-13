@@ -35,7 +35,8 @@ from dashboard.components import (
     render_live_target_status_list,
     render_active_alerts_list,
     render_recent_activity_rows,
-    get_brand_icon
+    get_brand_icon,
+    clean_html
 )
 
 # 1. Page Configuration
@@ -65,7 +66,7 @@ if "search_query" not in st.session_state:
 # --- Sidebar UI Matching Mockup ---
 with st.sidebar:
     # Brand Header
-    st.markdown("""
+    st.html(clean_html("""
     <div class="sidebar-brand-container">
         <div class="brand-icon-wrapper">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -77,7 +78,7 @@ with st.sidebar:
             <div class="brand-subtitle">Observe • Analyze • Stay Ahead</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """))
 
     # Navigation Menu
     pages = [
@@ -110,7 +111,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Ambient soundwave graphic & Status pill at bottom
-    st.markdown("""
+    st.html(clean_html("""
     <div class="sidebar-bottom-container">
         <svg viewBox="0 0 260 40" style="width:100%; height:32px; opacity:0.35; margin-bottom:8px;">
             <path d="M0,20 Q30,5 60,20 T120,20 T180,20 T240,20" fill="none" stroke="#10b981" stroke-width="1.5"/>
@@ -125,7 +126,7 @@ with st.sidebar:
         </div>
         <div class="sidebar-footer-version">NetTelemetry v1.0.0</div>
     </div>
-    """, unsafe_allow_html=True)
+    """))
 
 
 # --- Real-Time Dashboard View Fragment ---
@@ -165,10 +166,10 @@ def render_dashboard_content():
         )
         st.session_state["search_query"] = search_query
     with actions_col:
-        st.markdown(render_top_header_actions(), unsafe_allow_html=True)
+        st.html(render_top_header_actions())
 
     # Greeting Banner
-    st.markdown(render_hero_greeting(), unsafe_allow_html=True)
+    st.html(render_hero_greeting())
 
     # 2-Column Responsive Layout
     col_main, col_side = st.columns([2.15, 1.0], gap="medium")
@@ -180,103 +181,97 @@ def render_dashboard_content():
         # 1. 4 KPI Cards Row
         kpi_cols = st.columns(4)
         with kpi_cols[0]:
-            st.markdown(render_kpi_card_1(total_targets=total_targets, online=online_count, offline=offline_count), unsafe_allow_html=True)
+            st.html(render_kpi_card_1(total_targets=total_targets, online=online_count, offline=offline_count))
         with kpi_cols[1]:
-            st.markdown(render_kpi_card_2(avg_rtt=avg_rtt, change_pct=-18.0), unsafe_allow_html=True)
+            st.html(render_kpi_card_2(avg_rtt=avg_rtt, change_pct=-18.0))
         with kpi_cols[2]:
-            st.markdown(render_kpi_card_3(loss_pct=avg_loss, change_pct=-6.0), unsafe_allow_html=True)
+            st.html(render_kpi_card_3(loss_pct=avg_loss, change_pct=-6.0))
         with kpi_cols[3]:
-            st.markdown(render_kpi_card_4(avail_pct=avail_pct, change_pct=2.1), unsafe_allow_html=True)
-
-        st.markdown("<div style='height: 0.75rem;'></div>", unsafe_allow_html=True)
+            st.html(render_kpi_card_4(avail_pct=avail_pct, change_pct=2.1))
 
         # 2. Network Topology Card
-        st.markdown('<div class="noc-card" style="padding-bottom: 0.5rem; margin-bottom: 0.75rem;">', unsafe_allow_html=True)
-        map_hdr_l, map_hdr_r = st.columns([1.8, 1.2])
-        with map_hdr_l:
-            st.markdown("""
-            <div style="display:flex; align-items:center; gap:8px; padding-top:4px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
-                <span class="card-title-text" style="font-size:1rem;">Network Topology</span>
-                <span class="live-badge-pill">Live</span>
+        with st.container(border=True):
+            map_hdr_l, map_hdr_r = st.columns([1.8, 1.2])
+            with map_hdr_l:
+                st.html("""
+                <div style="display:flex; align-items:center; gap:8px; padding-top:4px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                    <span class="card-title-text" style="font-size:1rem;">Network Topology</span>
+                    <span class="live-badge-pill">Live</span>
+                </div>
+                """)
+            with map_hdr_r:
+                map_tabs = st.radio(
+                    "Topology View",
+                    ["World View", "Region", "List"],
+                    index=["World View", "Region", "List"].index(st.session_state["map_view"]),
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
+                st.session_state["map_view"] = map_tabs
+
+            if map_tabs == "World View" or map_tabs == "Region":
+                map_fig = create_topology_map_figure(filtered_targets)
+                st.plotly_chart(map_fig, use_container_width=True, config={"displayModeBar": False, "staticPlot": False})
+            else:
+                list_df = pd.DataFrame([{
+                    "Target": t["name"],
+                    "IP Address": t["host"],
+                    "Status": t["status"],
+                    "Current RTT (ms)": f"{t['rtt_ms']} ms",
+                    "Packet Loss (%)": f"{t['loss_pct']}%",
+                    "Coordinates": f"({t['lat']:.2f}, {t['lon']:.2f})"
+                } for t in filtered_targets])
+                st.dataframe(list_df, use_container_width=True, hide_index=True)
+
+            st.html("""
+            <div class="map-legend-bar" style="margin-top: -6px; margin-bottom: 4px; padding-left: 6px;">
+                <div class="legend-item"><div class="legend-dot" style="background:#10b981;"></div><span>Online</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Degraded</span></div>
+                <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Offline</span></div>
             </div>
-            """, unsafe_allow_html=True)
-        with map_hdr_r:
-            map_tabs = st.radio(
-                "Topology View",
-                ["World View", "Region", "List"],
-                index=["World View", "Region", "List"].index(st.session_state["map_view"]),
-                horizontal=True,
-                label_visibility="collapsed"
-            )
-            st.session_state["map_view"] = map_tabs
-
-        if map_tabs == "World View" or map_tabs == "Region":
-            map_fig = create_topology_map_figure(filtered_targets)
-            st.plotly_chart(map_fig, use_container_width=True, config={"displayModeBar": False, "staticPlot": False})
-        else:
-            # List View
-            list_df = pd.DataFrame([{
-                "Target": t["name"],
-                "IP Address": t["host"],
-                "Status": t["status"],
-                "Current RTT (ms)": f"{t['rtt_ms']} ms",
-                "Packet Loss (%)": f"{t['loss_pct']}%",
-                "Coordinates": f"({t['lat']:.2f}, {t['lon']:.2f})"
-            } for t in filtered_targets])
-            st.dataframe(list_df, use_container_width=True, hide_index=True)
-
-        # Map Legend
-        st.markdown("""
-        <div class="map-legend-bar" style="margin-top: -10px; margin-bottom: 10px; padding-left: 10px;">
-            <div class="legend-item"><div class="legend-dot" style="background:#10b981;"></div><span>Online</span></div>
-            <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div><span>Degraded</span></div>
-            <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div><span>Offline</span></div>
-        </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """)
 
         # 3. Bottom Grid: 3 Cards (Performance Trends, Packet Loss & Availability, Top Targets by Latency)
         bg_col1, bg_col2, bg_col3 = st.columns([1.35, 1.0, 1.0], gap="small")
 
         # Bottom Card 1: Performance Trends
         with bg_col1:
-            st.markdown('<div class="noc-card" style="height: 100%;">', unsafe_allow_html=True)
-            perf_hdr_l, perf_hdr_r = st.columns([1.3, 1.1])
-            with perf_hdr_l:
-                st.markdown("""
-                <div style="display:flex; align-items:center; gap:6px; padding-top:4px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                        <polyline points="17 6 23 6 23 12"></polyline>
-                    </svg>
-                    <span class="card-title-text" style="font-size:0.875rem;">Performance Trends</span>
-                </div>
-                """, unsafe_allow_html=True)
-            with perf_hdr_r:
-                tf_tabs = st.radio(
-                    "Trend Timeframe",
-                    ["1h", "6h", "24h", "7d"],
-                    index=["1h", "6h", "24h", "7d"].index(st.session_state["trend_timeframe"]),
-                    horizontal=True,
-                    label_visibility="collapsed"
-                )
-                st.session_state["trend_timeframe"] = tf_tabs
+            with st.container(border=True):
+                perf_hdr_l, perf_hdr_r = st.columns([1.3, 1.1])
+                with perf_hdr_l:
+                    st.html("""
+                    <div style="display:flex; align-items:center; gap:6px; padding-top:4px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                            <polyline points="17 6 23 6 23 12"></polyline>
+                        </svg>
+                        <span class="card-title-text" style="font-size:0.875rem;">Performance Trends</span>
+                    </div>
+                    """)
+                with perf_hdr_r:
+                    tf_tabs = st.radio(
+                        "Trend Timeframe",
+                        ["1h", "6h", "24h", "7d"],
+                        index=["1h", "6h", "24h", "7d"].index(st.session_state["trend_timeframe"]),
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+                    st.session_state["trend_timeframe"] = tf_tabs
 
-            trend_fig = create_performance_trends_figure()
-            st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False})
-            st.markdown('</div>', unsafe_allow_html=True)
+                trend_fig = create_performance_trends_figure()
+                st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False})
 
         # Bottom Card 2: Packet Loss & Availability Donut
         with bg_col2:
-            st.markdown("""
-            <div class="noc-card" style="height: 100%;">
+            with st.container(border=True):
+                st.html("""
                 <div class="card-title-bar">
                     <div class="card-title-left">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
@@ -286,25 +281,24 @@ def render_dashboard_content():
                         <span class="card-title-text" style="font-size:0.875rem;">Packet Loss & Availability</span>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """)
 
-            donut_fig = create_availability_donut_figure(avail_pct=avail_pct, successful=1217, failed=29)
-            st.plotly_chart(donut_fig, use_container_width=True, config={"displayModeBar": False})
+                donut_fig = create_availability_donut_figure(avail_pct=avail_pct, successful=1217, failed=29)
+                st.plotly_chart(donut_fig, use_container_width=True, config={"displayModeBar": False})
 
-            st.markdown("""
-            <div style="font-size: 0.75rem; color:#64748b; margin-top:-10px; display:flex; flex-direction:column; gap:4px; padding-left:12px;">
-                <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981;"></span><span>Successful: <b style="color:#1e293b;">1,217</b></span></div>
-                <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#f43f5e;"></span><span>Failed: <b style="color:#1e293b;">29</b></span></div>
-                <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span><span>Packet Loss: <b style="color:#1e293b;">2.4%</b></span></div>
-            </div>
-            """, unsafe_allow_html=True)
+                st.html("""
+                <div style="font-size: 0.75rem; color:#64748b; margin-top:-6px; display:flex; flex-direction:column; gap:4px; padding-left:12px;">
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981;"></span><span>Successful: <b style="color:#1e293b;">1,217</b></span></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#f43f5e;"></span><span>Failed: <b style="color:#1e293b;">29</b></span></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span><span>Packet Loss: <b style="color:#1e293b;">2.4%</b></span></div>
+                </div>
+                """)
 
         # Bottom Card 3: Top Targets by Latency
         with bg_col3:
-            st.markdown("""
-            <div class="noc-card" style="height: 100%;">
-                <div class="card-title-bar">
+            with st.container(border=True):
+                st.html("""
+                <div class="card-title-bar" style="margin-bottom: 0.75rem;">
                     <div class="card-title-left">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
                             <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -314,24 +308,16 @@ def render_dashboard_content():
                         <span class="card-title-text" style="font-size:0.875rem;">Top Targets by Latency</span>
                     </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            latency_bars_html = render_latency_progress_bars(targets)
-            st.markdown(f"""
-            <div style="background:#ffffff; border-radius:10px; padding:0.5rem;">
-                {latency_bars_html}
-            </div>
-            """, unsafe_allow_html=True)
+                """)
+                st.html(render_latency_progress_bars(targets))
 
     # ==========================
     # COLUMN 2: COMPACT RIGHT PANEL (~30%)
     # ==========================
     with col_side:
         # Card 1: Live Target Status
-        target_list_html = render_live_target_status_list(targets)
-        st.markdown(f"""
-        <div class="noc-card">
+        with st.container(border=True):
+            st.html("""
             <div class="card-title-bar">
                 <div class="card-title-left">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
@@ -342,16 +328,12 @@ def render_dashboard_content():
                 </div>
                 <span class="view-all-link">View All →</span>
             </div>
-            <div>
-                {target_list_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """)
+            st.html(render_live_target_status_list(targets))
 
         # Card 2: Active Alerts
-        alerts_html = render_active_alerts_list(anomalies)
-        st.markdown(f"""
-        <div class="noc-card">
+        with st.container(border=True):
+            st.html("""
             <div class="card-title-bar">
                 <div class="card-title-left">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
@@ -362,16 +344,12 @@ def render_dashboard_content():
                 </div>
                 <span class="view-all-link">View All →</span>
             </div>
-            <div>
-                {alerts_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """)
+            st.html(render_active_alerts_list(anomalies))
 
         # Card 3: Recent Activity
-        activity_html = render_recent_activity_rows(recent_measurements)
-        st.markdown(f"""
-        <div class="noc-card">
+        with st.container(border=True):
+            st.html("""
             <div class="card-title-bar">
                 <div class="card-title-left">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
@@ -382,17 +360,14 @@ def render_dashboard_content():
                 </div>
                 <span class="view-all-link">View All →</span>
             </div>
-            <div>
-                {activity_html}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """)
+            st.html(render_recent_activity_rows(recent_measurements))
 
 
 # --- Supplementary Views (When sidebar menu is clicked) ---
 
 def render_targets_view():
-    st.markdown("<h2 style='color:#0f172a;'>🎯 Network Targets Management</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>🎯 Network Targets Management</h2>")
     st.caption("Inspect and configure active network monitoring targets stored in SQLite.")
     
     conn = get_connection()
@@ -428,7 +403,7 @@ def render_targets_view():
                 st.rerun()
 
 def render_measurements_view():
-    st.markdown("<h2 style='color:#0f172a;'>📊 Telemetry Measurements Log</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>📊 Telemetry Measurements Log</h2>")
     st.caption("Raw ICMP / TCP packet-level telemetry records stored in SQLite database.")
     
     conn = get_connection()
@@ -438,7 +413,7 @@ def render_measurements_view():
     st.dataframe(df, use_container_width=True)
 
 def render_analytics_view():
-    st.markdown("<h2 style='color:#0f172a;'>📈 Performance Analytics & Aggregated Windows</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>📈 Performance Analytics & Aggregated Windows</h2>")
     st.caption("Rolling statistical windows: Jitter, Availability, P95, and P99 percentiles.")
     
     conn = get_connection()
@@ -448,7 +423,7 @@ def render_analytics_view():
     st.dataframe(df, use_container_width=True)
 
 def render_alerts_view():
-    st.markdown("<h2 style='color:#0f172a;'>🔔 Anomaly Detection Timeline</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>🔔 Anomaly Detection Timeline</h2>")
     st.caption("Autonomous threshold evaluations and historical network degradation flags.")
     
     conn = get_connection()
@@ -458,7 +433,7 @@ def render_alerts_view():
     st.dataframe(df, use_container_width=True)
 
 def render_reports_view():
-    st.markdown("<h2 style='color:#0f172a;'>📄 Network Operations Center (NOC) Executive Report</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>📄 Network Operations Center (NOC) Executive Report</h2>")
     st.markdown("""
     ### NetTelemetry Computer Networks Implementation
     - **Active Probing vs Passive Sniffing:** Active ICMP and controlled TCP connection tests measure end-to-end user experience and immediate packet drops rather than passively waiting for third-party traffic.
@@ -468,7 +443,7 @@ def render_reports_view():
     """)
 
 def render_settings_view():
-    st.markdown("<h2 style='color:#0f172a;'>⚙️ Telemetry Settings & Thresholds</h2>", unsafe_allow_html=True)
+    st.html("<h2 style='color:#0f172a;'>⚙️ Telemetry Settings & Thresholds</h2>")
     st.number_input("RTT Anomaly Spike Threshold (ms)", value=90.0)
     st.number_input("Packet Loss Warning Threshold (%)", value=5.0)
     st.number_input("Jitter Threshold (ms)", value=20.0)
