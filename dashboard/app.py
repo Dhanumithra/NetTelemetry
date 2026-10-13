@@ -233,7 +233,9 @@ with st.sidebar:
         index=[p[0] for p in pages].index(st.session_state["current_page"]),
         label_visibility="collapsed"
     )
-    st.session_state["current_page"] = selected_nav
+    if selected_nav != st.session_state["current_page"]:
+        st.session_state["current_page"] = selected_nav
+        st.rerun()
 
     st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
@@ -350,6 +352,31 @@ def render_universal_top_navbar():
                     st.toast("Signed out successfully.", icon="👋")
                     st.rerun()
 
+    # Permanent Top Navigation Bar (Always visible on all screens)
+    nav_tabs = [
+        ("Dashboard", "🏠 Dashboard"),
+        ("Targets", "🎯 Targets"),
+        ("Measurements", "📊 Measurements"),
+        ("Analytics", "📈 Analytics"),
+        ("Alerts", "🔔 Alerts"),
+        ("Reports", "📄 Reports"),
+        ("Settings", "⚙️ Settings"),
+    ]
+    curr_pg = st.session_state.get("current_page", "Dashboard")
+    nav_cols = st.columns(len(nav_tabs), gap="small")
+    for idx, (p_id, p_label) in enumerate(nav_tabs):
+        with nav_cols[idx]:
+            is_active = (curr_pg == p_id)
+            if st.button(
+                p_label,
+                key=f"topnav_btn_{p_id}",
+                type="primary" if is_active else "secondary",
+                use_container_width=True
+            ):
+                if curr_pg != p_id:
+                    st.session_state["current_page"] = p_id
+                    st.rerun()
+
 render_universal_top_navbar()
 
 
@@ -425,20 +452,21 @@ def render_dashboard_content():
         # Operational Quick-Filter Pill Row
         st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
         kf_1, kf_2, kf_3, kf_4, kf_5 = st.columns([1.1, 1, 1, 1, 1.2])
+        curr_sf = st.session_state.get("status_filter", "All")
         with kf_1:
-            if st.button(f"🔍 All ({total_targets})", key="kf_all", use_container_width=True):
+            if st.button(f"🔍 All ({total_targets})", key="kf_all", type="primary" if curr_sf == "All" else "secondary", use_container_width=True):
                 st.session_state["status_filter"] = "All"
                 st.rerun()
         with kf_2:
-            if st.button(f"🟢 Online ({online_count})", key="kf_online", use_container_width=True):
+            if st.button(f"🟢 Online ({online_count})", key="kf_online", type="primary" if curr_sf == "Online" else "secondary", use_container_width=True):
                 st.session_state["status_filter"] = "Online"
                 st.rerun()
         with kf_3:
-            if st.button(f"🟡 Degraded ({degraded_count})", key="kf_deg", use_container_width=True):
+            if st.button(f"🟡 Degraded ({degraded_count})", key="kf_deg", type="primary" if curr_sf == "Degraded" else "secondary", use_container_width=True):
                 st.session_state["status_filter"] = "Degraded"
                 st.rerun()
         with kf_4:
-            if st.button(f"🔴 Offline ({offline_count})", key="kf_off", use_container_width=True):
+            if st.button(f"🔴 Offline ({offline_count})", key="kf_off", type="primary" if curr_sf == "Offline" else "secondary", use_container_width=True):
                 st.session_state["status_filter"] = "Offline"
                 st.rerun()
         with kf_5:

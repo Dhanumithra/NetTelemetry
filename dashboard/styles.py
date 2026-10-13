@@ -99,6 +99,24 @@ div[data-testid="stMarkdownContainer"] small {
 .kpi-subtext-amber { color: #fbbf24 !important; }
 .kpi-subtext-purple { color: #c084fc !important; }
 
+/* KPI Icon Circles in Dark Mode - Vibrant with High Contrast */
+.kpi-icon-green {
+    background: rgba(16, 185, 129, 0.25) !important;
+    color: #34d399 !important;
+}
+.kpi-icon-blue {
+    background: rgba(59, 130, 246, 0.25) !important;
+    color: #60a5fa !important;
+}
+.kpi-icon-amber {
+    background: rgba(245, 158, 11, 0.25) !important;
+    color: #fbbf24 !important;
+}
+.kpi-icon-purple {
+    background: rgba(139, 92, 246, 0.25) !important;
+    color: #c084fc !important;
+}
+
 /* Status Badges in Dark Mode */
 .badge-online {
     background: #064e3b !important;
@@ -124,66 +142,164 @@ div[data-testid="stMarkdownContainer"] small {
     border: 1px solid rgba(251, 191, 36, 0.4) !important;
 }
 
-/* Native Buttons in Dark Mode */
+/* ALL Secondary Buttons in Dark Mode (no jarring white boxes) */
+button[data-testid="stBaseButton-secondary"],
 .stButton > button,
-div[data-testid="stBaseButton-secondary"] {
-    background-color: #1e293b !important;
-    color: #f8fafc !important;
-    border: 1px solid #475569 !important;
+div[data-testid="stButton"] > button,
+div[data-testid="column"] button {
+    background-color: #162032 !important;
+    background: #162032 !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
     font-weight: 600 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    transition: all 0.15s ease !important;
 }
 
+button[data-testid="stBaseButton-secondary"]:hover,
 .stButton > button:hover,
-div[data-testid="stBaseButton-secondary"]:hover {
-    background-color: #334155 !important;
-    color: #ffffff !important;
-    border-color: #94a3b8 !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
-}
-
-/* Top Navbar Buttons in Dark Mode */
-button[key="top_theme_btn"],
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button {
+div[data-testid="stButton"] > button:hover,
+div[data-testid="column"] button:hover {
+    background-color: #1e293b !important;
     background: #1e293b !important;
-    border: 1px solid #475569 !important;
-    color: #fbbf24 !important;
+    border-color: #64748b !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45) !important;
 }
 
-button[key="top_theme_btn"]:hover,
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover {
-    background: #334155 !important;
-    border-color: #94a3b8 !important;
-    color: #fde047 !important;
+/* Primary Highlight Buttons in Dark Mode */
+button[data-testid="stBaseButton-primary"],
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background-color: #0d9488 !important;
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%) !important;
+    color: #ffffff !important;
+    border: 1px solid #14b8a6 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.4) !important;
+    font-weight: 700 !important;
 }
 
-/* Popover Buttons & Menus in Dark Mode */
+button[data-testid="stBaseButton-primary"]:hover,
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover {
+    background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
+    border-color: #2dd4bf !important;
+    box-shadow: 0 4px 14px rgba(20, 184, 166, 0.6) !important;
+}
+
+/* Popover Trigger Buttons in Dark Mode */
 div[data-testid="stPopover"] > button,
-div[data-testid="column"]:last-child div[data-testid="stPopover"] > button {
-    background: #1e293b !important;
-    border: 1px solid #475569 !important;
-    color: #ffffff !important;
+.top-header-actions-bar div[data-testid="stPopover"] > button {
+    background: #162032 !important;
+    background-color: #162032 !important;
+    border: 1px solid #334155 !important;
+    color: #f8fafc !important;
+    border-radius: 20px !important;
 }
 
 div[data-testid="stPopover"] > button:hover,
-div[data-testid="column"]:last-child div[data-testid="stPopover"] > button:hover {
-    background: #334155 !important;
-    border-color: #94a3b8 !important;
+.top-header-actions-bar div[data-testid="stPopover"] > button:hover {
+    background: #25334d !important;
+    background-color: #25334d !important;
+    border-color: #64748b !important;
     color: #ffffff !important;
 }
 
+/* FLOATING POPOVER CONTAINER IN DARK MODE (BaseWeb Portal) */
+/* Force dark background on portal and eliminate white-on-white text */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div,
+div[data-baseweb="popover"] [data-testid="stPopoverBody"],
 div[data-testid="stPopoverBody"],
-div[data-testid="stPopoverContent"] {
-    background-color: #111827 !important;
+div[data-testid="stPopoverContent"],
+div[data-baseweb="popover"] div[role="dialog"] {
+    background: #0f172a !important;
+    background-color: #0f172a !important;
     border: 1px solid #334155 !important;
+    border-radius: 12px !important;
     color: #f8fafc !important;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+    box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85) !important;
 }
 
+/* Transparent nested inner blocks inside popover so background is solid #0f172a */
+div[data-baseweb="popover"] div[data-testid="stVerticalBlock"],
+div[data-baseweb="popover"] div[data-testid="stElementContainer"],
+div[data-baseweb="popover"] div[data-testid="stMarkdownContainer"],
+div[data-testid="stPopoverBody"] div[data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"] div[data-testid="stElementContainer"],
+div[data-testid="stPopoverBody"] div[data-testid="stMarkdownContainer"] {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+div[data-baseweb="popover"] p,
+div[data-baseweb="popover"] span,
+div[data-baseweb="popover"] li,
+div[data-baseweb="popover"] ul,
+div[data-baseweb="popover"] label,
 div[data-testid="stPopoverBody"] p,
 div[data-testid="stPopoverBody"] span,
-div[data-testid="stPopoverBody"] strong {
-    color: #f8fafc !important;
+div[data-testid="stPopoverBody"] li,
+div[data-testid="stPopoverBody"] label {
+    color: #e2e8f0 !important;
+}
+
+div[data-baseweb="popover"] strong,
+div[data-baseweb="popover"] b,
+div[data-testid="stPopoverBody"] strong,
+div[data-testid="stPopoverBody"] b {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+div[data-baseweb="popover"] h1,
+div[data-baseweb="popover"] h2,
+div[data-baseweb="popover"] h3,
+div[data-baseweb="popover"] h4,
+div[data-testid="stPopoverBody"] h1,
+div[data-testid="stPopoverBody"] h2,
+div[data-testid="stPopoverBody"] h3,
+div[data-testid="stPopoverBody"] h4 {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+div[data-baseweb="popover"] a,
+div[data-testid="stPopoverBody"] a {
+    color: #38bdf8 !important;
+}
+
+div[data-baseweb="popover"] code,
+div[data-testid="stPopoverBody"] code {
+    background: #1e293b !important;
+    background-color: #1e293b !important;
+    color: #38bdf8 !important;
+    border: 1px solid #334155 !important;
+    font-weight: 600 !important;
+}
+
+div[data-baseweb="popover"] button,
+div[data-testid="stPopoverBody"] button {
+    background-color: #1e293b !important;
+    background: #1e293b !important;
+    color: #ffffff !important;
+    border: 1px solid #475569 !important;
+    border-radius: 8px !important;
+}
+
+div[data-baseweb="popover"] button:hover,
+div[data-testid="stPopoverBody"] button:hover {
+    background-color: #334155 !important;
+    background: #334155 !important;
+    color: #ffffff !important;
+    border-color: #94a3b8 !important;
+}
+
+div[data-baseweb="popover"] hr,
+div[data-testid="stPopoverBody"] hr {
+    border-color: #334155 !important;
 }
 
 /* Search Input in Dark Mode */
@@ -294,19 +410,58 @@ html, body, [class*="css"] {
     background-color: var(--bg-main) !important;
 }
 
-/* Streamlit Header / Footer adjustments - completely eliminate mouse interception */
+/* Streamlit Header / App Header adjustments */
 header[data-testid="stHeader"],
 .stAppHeader {
-    display: none !important;
+    background: transparent !important;
     height: 0 !important;
     min-height: 0 !important;
-    max-height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     pointer-events: none !important;
-    visibility: hidden !important;
-    z-index: -9999 !important;
-    opacity: 0 !important;
+    border: none !important;
+    z-index: 99999 !important;
+}
+
+/* Ensure sidebar collapse toggle button is permanently visible, stylish & clickable */
+[data-testid="collapsedControl"],
+header[data-testid="stHeader"] button,
+button[data-testid="stSidebarCollapseButton"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    top: 0.85rem !important;
+    left: 0.85rem !important;
+    z-index: 999999 !important;
+    background: #0e2428 !important;
+    color: #10b981 !important;
+    border: 1px solid rgba(16, 185, 129, 0.4) !important;
+    border-radius: 8px !important;
+    width: 38px !important;
+    height: 38px !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="collapsedControl"]:hover,
+header[data-testid="stHeader"] button:hover,
+button[data-testid="stSidebarCollapseButton"]:hover {
+    background: #17373c !important;
+    border-color: #10b981 !important;
+    color: #ffffff !important;
+    transform: scale(1.05) !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4) !important;
+}
+
+[data-testid="collapsedControl"] svg,
+button[data-testid="stSidebarCollapseButton"] svg {
+    fill: #10b981 !important;
+    stroke: #10b981 !important;
 }
 
 footer {
@@ -1300,43 +1455,53 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p
     }
 }
 
-/* Circular Top Action Header Buttons (Theme & Bell icon) */
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button {
-    width: 38px !important;
-    height: 38px !important;
-    min-height: 38px !important;
-    max-height: 38px !important;
-    min-width: 38px !important;
-    max-width: 38px !important;
-    border-radius: 50% !important;
+/* Secondary & Native Button Base Styles (Light Mode) */
+button[data-testid="stBaseButton-secondary"],
+.stButton > button {
+    background-color: #ffffff !important;
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0 !important;
-    font-size: 1.1rem !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-    cursor: pointer !important;
-    transition: all 0.15s ease !important;
-}
-
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover {
-    border-color: #cbd5e1 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
-}
-
-/* Popover Buttons */
-div[data-testid="stPopover"] > button {
-    cursor: pointer !important;
+    color: #1e293b !important;
     border-radius: 8px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
     transition: all 0.15s ease !important;
 }
 
-/* User Profile Capsule Popover Button in Header */
-.top-header-actions-bar div[data-testid="stPopover"] > button,
-div[data-testid="column"]:last-child div[data-testid="stPopover"] > button {
+button[data-testid="stBaseButton-secondary"]:hover,
+.stButton > button:hover {
+    background-color: #f8fafc !important;
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Primary Highlight Buttons (Light Mode) */
+button[data-testid="stBaseButton-primary"],
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background: #0e2428 !important;
+    background-color: #0e2428 !important;
+    color: #ffffff !important;
+    border: 1px solid #17373c !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 6px rgba(14, 36, 40, 0.25) !important;
+    font-weight: 700 !important;
+}
+
+button[data-testid="stBaseButton-primary"]:hover,
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover {
+    background: #17373c !important;
+    background-color: #17373c !important;
+    color: #ffffff !important;
+}
+
+/* Popover Trigger Buttons Base */
+div[data-testid="stPopover"] > button,
+.top-header-actions-bar div[data-testid="stPopover"] > button {
+    cursor: pointer !important;
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
     border-radius: 20px !important;
@@ -1350,33 +1515,106 @@ div[data-testid="column"]:last-child div[data-testid="stPopover"] > button {
     display: inline-flex !important;
     align-items: center !important;
     gap: 0.5rem !important;
-    cursor: pointer !important;
+    transition: all 0.15s ease !important;
 }
 
-.top-header-actions-bar div[data-testid="stPopover"] > button:hover,
-div[data-testid="column"]:last-child div[data-testid="stPopover"] > button:hover {
+div[data-testid="stPopover"] > button:hover,
+.top-header-actions-bar div[data-testid="stPopover"] > button:hover {
     border-color: #cbd5e1 !important;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Card Header 'View All →' Links */
-button[key^="view_all_"] {
-    background: transparent !important;
-    border: none !important;
-    color: #0d9488 !important;
-    font-size: 0.775rem !important;
-    font-weight: 600 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    height: auto !important;
-    min-height: unset !important;
-    cursor: pointer !important;
+/* FLOATING POPOVER CONTAINER IN LIGHT MODE (BaseWeb Portal) */
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] > div,
+div[data-baseweb="popover"] [data-testid="stPopoverBody"],
+div[data-testid="stPopoverBody"],
+div[data-testid="stPopoverContent"],
+div[data-baseweb="popover"] div[role="dialog"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    color: #0f172a !important;
+    box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.12) !important;
 }
 
-button[key^="view_all_"]:hover {
-    color: #047857 !important;
-    text-decoration: underline !important;
+div[data-baseweb="popover"] div[data-testid="stVerticalBlock"],
+div[data-baseweb="popover"] div[data-testid="stElementContainer"],
+div[data-baseweb="popover"] div[data-testid="stMarkdownContainer"],
+div[data-testid="stPopoverBody"] div[data-testid="stVerticalBlock"],
+div[data-testid="stPopoverBody"] div[data-testid="stElementContainer"],
+div[data-testid="stPopoverBody"] div[data-testid="stMarkdownContainer"] {
     background: transparent !important;
+    background-color: transparent !important;
+}
+
+div[data-baseweb="popover"] p,
+div[data-baseweb="popover"] span,
+div[data-baseweb="popover"] li,
+div[data-baseweb="popover"] ul,
+div[data-baseweb="popover"] label,
+div[data-testid="stPopoverBody"] p,
+div[data-testid="stPopoverBody"] span,
+div[data-testid="stPopoverBody"] li,
+div[data-testid="stPopoverBody"] label {
+    color: #1e293b !important;
+}
+
+div[data-baseweb="popover"] strong,
+div[data-baseweb="popover"] b,
+div[data-testid="stPopoverBody"] strong,
+div[data-testid="stPopoverBody"] b {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+div[data-baseweb="popover"] h1,
+div[data-baseweb="popover"] h2,
+div[data-baseweb="popover"] h3,
+div[data-baseweb="popover"] h4,
+div[data-testid="stPopoverBody"] h1,
+div[data-testid="stPopoverBody"] h2,
+div[data-testid="stPopoverBody"] h3,
+div[data-testid="stPopoverBody"] h4 {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+div[data-baseweb="popover"] code,
+div[data-testid="stPopoverBody"] code {
+    background: #f1f5f9 !important;
+    background-color: #f1f5f9 !important;
+    color: #0d9488 !important;
+    border: 1px solid #e2e8f0 !important;
+    font-weight: 600 !important;
+}
+
+div[data-baseweb="popover"] a,
+div[data-testid="stPopoverBody"] a {
+    color: #0d9488 !important;
+}
+
+div[data-baseweb="popover"] button,
+div[data-testid="stPopoverBody"] button {
+    background-color: #f8fafc !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+}
+
+div[data-baseweb="popover"] button:hover,
+div[data-testid="stPopoverBody"] button:hover {
+    background-color: #f1f5f9 !important;
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+div[data-baseweb="popover"] hr,
+div[data-testid="stPopoverBody"] hr {
+    border-color: #e2e8f0 !important;
 }
 </style>
 """
