@@ -102,19 +102,26 @@ def render_top_header_actions() -> str:
     """
     return clean_html(html)
 
-def render_hero_greeting(user_name: str = "Dhanumithra") -> str:
+def render_hero_greeting(user_name: str = "Dhanumithra", is_live: bool = False, interval_sec: int = 5) -> str:
     now = datetime.datetime.now()
     formatted_date = now.strftime("%a, %b %d, %Y")
-    formatted_time = now.strftime("%I:%M %p")
+    formatted_time = now.strftime("%I:%M:%S %p")
     hour = now.hour
     greeting_prefix = "Good Morning" if hour < 12 else ("Good Afternoon" if hour < 17 else "Good Evening")
+
+    live_badge = (
+        f'<span class="live-badge-pill" style="background:#ecfdf5; color:#059669; border:1px solid rgba(16,185,129,0.3);">'
+        f'● Live Probing ({interval_sec}s)</span>'
+        if is_live else
+        '<span class="live-badge-pill" style="background:#f1f5f9; color:#64748b;">⏸️ Monitoring Paused</span>'
+    )
 
     html = f"""
     <div class="hero-greeting-container" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">
         <div>
-            <div class="hero-subtitle-tag">NETWORK TELEMETRY</div>
+            <div class="hero-subtitle-tag">NETWORK TELEMETRY OPERATION CENTER</div>
             <div class="hero-main-title">{greeting_prefix}, {user_name}!</div>
-            <div class="hero-subtext">Here's what's happening with your network targets today.</div>
+            <div class="hero-subtext">Real-time network telemetry, anomaly inspection, and packet latency tracking.</div>
         </div>
         <div class="hero-meta-badge">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2">
@@ -125,7 +132,7 @@ def render_hero_greeting(user_name: str = "Dhanumithra") -> str:
             </svg>
             <span style="font-size:0.775rem; color:#475569; font-weight:500;">{formatted_date}</span>
             <span style="font-size:0.775rem; color:#64748b; font-weight:600;">{formatted_time}</span>
-            <span class="live-badge-pill">Live</span>
+            {live_badge}
         </div>
     </div>
     """
@@ -188,7 +195,7 @@ def render_kpi_card_1(total_targets: int = 5, online: int = 2, offline: int = 0)
                 </div>
                 <span class="kpi-title">Total Targets</span>
             </div>
-            <span class="kpi-dots">···</span>
+            <span class="live-badge-pill" style="font-size:0.65rem; padding:2px 6px;">Live</span>
         </div>
         <div class="kpi-value">{total_targets}</div>
         <div class="kpi-subtext kpi-subtext-green">
@@ -213,7 +220,7 @@ def render_kpi_card_2(avg_rtt: float = 32.0, change_pct: float = -18.0) -> str:
                 </div>
                 <span class="kpi-title">Avg. RTT</span>
             </div>
-            <span class="kpi-dots">···</span>
+            <span class="live-badge-pill" style="font-size:0.65rem; padding:2px 6px; background:#eff6ff; color:#2563eb;">RTT</span>
         </div>
         <div class="kpi-value">{int(round(avg_rtt))} ms</div>
         <div class="kpi-subtext kpi-subtext-blue">
@@ -239,7 +246,7 @@ def render_kpi_card_3(loss_pct: float = 2.4, change_pct: float = -6.0) -> str:
                 </div>
                 <span class="kpi-title">Packet Loss</span>
             </div>
-            <span class="kpi-dots">···</span>
+            <span class="live-badge-pill" style="font-size:0.65rem; padding:2px 6px; background:#fef3c7; color:#d97706;">Loss</span>
         </div>
         <div class="kpi-value">{loss_pct:.1f}%</div>
         <div class="kpi-subtext kpi-subtext-amber">
@@ -263,7 +270,7 @@ def render_kpi_card_4(avail_pct: float = 97.6, change_pct: float = 2.1) -> str:
                 </div>
                 <span class="kpi-title">Availability</span>
             </div>
-            <span class="kpi-dots">···</span>
+            <span class="live-badge-pill" style="font-size:0.65rem; padding:2px 6px; background:#f5f3ff; color:#7c3aed;">SLA</span>
         </div>
         <div class="kpi-value">{avail_pct:.1f}%</div>
         <div class="kpi-subtext kpi-subtext-purple">

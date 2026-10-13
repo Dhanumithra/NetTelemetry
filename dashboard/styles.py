@@ -1070,10 +1070,7 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p
 }
 
 /* Circular Top Action Header Buttons (Theme & Bell icon) */
-button[key="top_theme_btn"],
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button,
-div[data-testid="stPopover"]:has(button:has(p:contains("🔔"))) > button,
-div[data-testid="stPopover"]:has(button:contains("🔔")) > button {
+div[data-testid="column"]:has(button[key="top_theme_btn"]) button {
     width: 38px !important;
     height: 38px !important;
     min-height: 38px !important;
@@ -1093,18 +1090,22 @@ div[data-testid="stPopover"]:has(button:contains("🔔")) > button {
     transition: all 0.15s ease !important;
 }
 
-button[key="top_theme_btn"]:hover,
-div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover,
-div[data-testid="stPopover"]:has(button:has(p:contains("🔔"))) > button:hover,
-div[data-testid="stPopover"]:has(button:contains("🔔")) > button:hover {
+div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover {
     border-color: #cbd5e1 !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* User Profile Capsule Popover Button */
-div[data-testid="stPopover"]:has(button:has(p:contains("▾"))) > button,
-div[data-testid="stPopover"]:has(button:contains("▾")) > button {
+/* Popover Buttons */
+div[data-testid="stPopover"] > button {
+    cursor: pointer !important;
+    border-radius: 8px !important;
+    transition: all 0.15s ease !important;
+}
+
+/* User Profile Capsule Popover Button in Header */
+.top-header-actions-bar div[data-testid="stPopover"] > button,
+div[data-testid="column"]:last-child div[data-testid="stPopover"] > button {
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
     border-radius: 20px !important;
@@ -1121,15 +1122,14 @@ div[data-testid="stPopover"]:has(button:contains("▾")) > button {
     cursor: pointer !important;
 }
 
-div[data-testid="stPopover"]:has(button:has(p:contains("▾"))) > button:hover,
-div[data-testid="stPopover"]:has(button:contains("▾")) > button:hover {
+.top-header-actions-bar div[data-testid="stPopover"] > button:hover,
+div[data-testid="column"]:last-child div[data-testid="stPopover"] > button:hover {
     border-color: #cbd5e1 !important;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Card Header 'View All →' Links */
-button[key^="view_all_"],
-button:has(p:contains("View All →")) {
+button[key^="view_all_"] {
     background: transparent !important;
     border: none !important;
     color: #0d9488 !important;
@@ -1142,8 +1142,7 @@ button:has(p:contains("View All →")) {
     cursor: pointer !important;
 }
 
-button[key^="view_all_"]:hover,
-button:has(p:contains("View All →")):hover {
+button[key^="view_all_"]:hover {
     color: #047857 !important;
     text-decoration: underline !important;
     background: transparent !important;

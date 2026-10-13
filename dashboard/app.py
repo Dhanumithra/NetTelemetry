@@ -21,7 +21,7 @@ from database.db import (
     get_user_by_username,
     DB_PATH
 )
-from telemetry.collector import probe_all_targets
+from telemetry.collector import probe_all_targets, collect_icmp_target
 from telemetry.metrics import calculate_rolling_statistics
 from analytics.anomaly_detector import AnomalyDetector
 from dashboard.styles import get_custom_css
@@ -77,9 +77,13 @@ if "thresh_loss" not in st.session_state:
 if "thresh_jitter" not in st.session_state:
     st.session_state["thresh_jitter"] = 20.0
 if "auto_probe" not in st.session_state:
-    st.session_state["auto_probe"] = True
+    st.session_state["auto_probe"] = False
+if "probe_cadence" not in st.session_state:
+    st.session_state["probe_cadence"] = "5s (Fast)"
+if "status_filter" not in st.session_state:
+    st.session_state["status_filter"] = "All"
 
-# Default user: Dhanumithra (pre-authenticated for frictionless access)
+# Default pre-seeded authenticated user (Dhanumithra)
 if "user" not in st.session_state:
     st.session_state["user"] = get_user_by_username("dhanumithra") or {
         "id": 1,
@@ -132,7 +136,7 @@ def render_auth_portal():
                         else:
                             st.error("Invalid username or password.")
                 with col_btn2:
-                    if st.button("⚡ Demo (Dhanumithra)", use_container_width=True):
+                    if st.button("⚡ Demo Login", use_container_width=True):
                         st.session_state["user"] = get_user_by_username("dhanumithra") or {
                             "id": 1,
                             "username": "dhanumithra",
@@ -187,7 +191,7 @@ if st.session_state.get("user") is None:
     render_auth_portal()
     st.stop()
 
-# Active logged-in user
+# Active logged-in user details
 curr_user = st.session_state["user"]
 curr_user_name = curr_user.get("full_name", "Dhanumithra")
 curr_role = curr_user.get("role", "NOC Lead / Administrator")
@@ -231,18 +235,29 @@ with st.sidebar:
     )
     st.session_state["current_page"] = selected_nav
 
-    st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
-    # Real-Time Telemetry Controls
-    live_toggle = st.toggle("🔴 Real-Time Monitoring", value=st.session_state["auto_probe"], help="Toggles automated real-time background telemetry cycles")
+    # Real-Time Telemetry Engine Controls
+    st.markdown("##### ⚡ Telemetry Engine")
+    live_toggle = st.toggle("🔴 Real-Time Monitoring", value=st.session_state["auto_probe"], help="Automatically probes network targets on schedule and refreshes metrics")
     st.session_state["auto_probe"] = live_toggle
 
+    if live_toggle:
+        cadence_opts = ["5s (Fast)", "10s (Standard)", "30s (Eco)"]
+        cadence_val = st.selectbox(
+            "Probe Cadence",
+            cadence_opts,
+            index=cadence_opts.index(st.session_state.get("probe_cadence", "5s (Fast)"))
+        )
+        st.session_state["probe_cadence"] = cadence_val
+
     # Quick Probe & Refresh Actions
-    if st.button("⚡ Probe Active Targets", use_container_width=True, help="Executes live parallel network probes to targets immediately"):
+    if st.button("⚡ Probe All Targets Now", use_container_width=True, help="Executes live parallel network probes to targets immediately"):
         with st.spinner("Probing targets in parallel..."):
             probe_all_targets()
             st.session_state["last_probe_time"] = datetime.datetime.now().strftime("%I:%M:%S %p")
             st.toast("⚡ Active probes completed successfully!", icon="✅")
+            st.rerun()
 
     if st.button("🔄 Refresh Data", use_container_width=True, help="Reload fresh metrics from SQLite"):
         st.rerun()
@@ -250,8 +265,9 @@ with st.sidebar:
     st.markdown("---")
 
     # Ambient soundwave graphic & Status pill at bottom
-    status_text = "System Online" if live_toggle else "Monitoring Paused"
-    sub_status = "Real-time engine running" if live_toggle else "Manual refresh active"
+    cadence_label = st.session_state.get("probe_cadence", "5s").split()[0]
+    status_text = f"Live Engine ({cadence_label})" if live_toggle else "Monitoring Paused"
+    sub_status = "Autonomous probing active" if live_toggle else "Manual refresh mode"
     st.html(clean_html(f"""
     <div class="sidebar-bottom-container">
         <svg viewBox="0 0 260 40" style="width:100%; height:32px; opacity:0.35; margin-bottom:8px;">
@@ -271,15 +287,88 @@ with st.sidebar:
 
 
 # ==========================================
+# UNIVERSAL TOP NAVBAR (Available on ALL pages)
+# ==========================================
+def render_universal_top_navbar():
+    is_dark = st.session_state.get("dark_mode", False)
+    u_info = st.session_state.get("user", {})
+    u_name = u_info.get("full_name", "Dhanumithra")
+    u_role = u_info.get("role", "NOC Lead / Administrator")
+    u_uname = u_info.get("username", "dhanumithra")
+    u_email = u_info.get("email", "dhanu@telemetry.noc")
+
+    anomalies = get_active_anomalies(limit=5)
+    anom_count = len(anomalies)
+
+    search_col, actions_col = st.columns([1.1, 1.9], gap="small")
+    with search_col:
+        search_query = st.text_input(
+            "Search target",
+            placeholder="🔍 Search target (IP or hostname)...",
+            value=st.session_state.get("search_query", ""),
+            label_visibility="collapsed",
+            key="universal_search_input"
+        )
+        st.session_state["search_query"] = search_query
+
+    with actions_col:
+        act_c1, act_c2, act_c3 = st.columns([0.8, 1.0, 2.5], gap="small")
+        with act_c1:
+            theme_icon = "☀️" if is_dark else "🌙"
+            if st.button(theme_icon, key="top_theme_btn", help="Toggle Light / Dark NOC Mode"):
+                st.session_state["dark_mode"] = not is_dark
+                st.rerun()
+        with act_c2:
+            bell_label = f"🔔 ({anom_count})" if anom_count > 0 else "🔔"
+            with st.popover(bell_label, help="Active Alerts & Quick Notifications"):
+                st.markdown("#### 🔔 System Notifications")
+                if anomalies:
+                    for a in anomalies:
+                        st.markdown(f"- **{a.get('name', 'Host')}**: {a.get('reason', 'Network anomaly')}")
+                    if st.button("🧹 Clear Notifications", key="pop_clear_all_notifs", use_container_width=True):
+                        with get_connection() as conn:
+                            conn.execute("DELETE FROM anomalies")
+                            conn.commit()
+                        st.toast("Notifications cleared.", icon="✅")
+                        st.rerun()
+                else:
+                    st.success("All systems optimal. 0 active alerts.")
+                if st.button("View Incident Log →", key="pop_goto_alerts", use_container_width=True):
+                    st.session_state["current_page"] = "Alerts"
+                    st.rerun()
+        with act_c3:
+            with st.popover(f"👤 {u_name} ▾", help="Operator Profile & Account Settings"):
+                st.markdown("### 🛡️ Operator Session")
+                st.markdown(f"**Name:** {u_name}")
+                st.markdown(f"**Username:** `@{u_uname}`")
+                st.markdown(f"**Role:** `{u_role}`")
+                st.markdown(f"**Email:** {u_email}")
+                st.markdown("**Session:** 🟢 Active NOC Authorization")
+                st.divider()
+                if st.button("🚪 Sign Out", key="btn_logout", use_container_width=True):
+                    st.session_state["user"] = None
+                    st.toast("Signed out successfully.", icon="👋")
+                    st.rerun()
+
+render_universal_top_navbar()
+
+
+# ==========================================
 # REAL-TIME DASHBOARD VIEW FRAGMENT
 # ==========================================
-fragment_interval = "15s" if st.session_state["auto_probe"] else None
+cadence_raw = st.session_state.get("probe_cadence", "5s")
+interval_sec = 5 if "5" in cadence_raw else (10 if "10" in cadence_raw else 30)
+frag_interval = f"{interval_sec}s" if st.session_state.get("auto_probe", False) else None
 
-@st.fragment(run_every=fragment_interval)
+@st.fragment(run_every=frag_interval)
 def render_dashboard_content():
     is_dark = st.session_state.get("dark_mode", False)
 
-    # Fetch latest data from SQLite
+    # If Real-Time Monitoring is ON, actively execute a parallel probe cycle
+    if st.session_state.get("auto_probe", False):
+        probe_all_targets()
+
+    # Fetch latest metrics from SQLite
     targets = get_target_latest_status()
     recent_measurements = get_recent_measurements(limit=5)
     anomalies = get_active_anomalies(limit=3)
@@ -291,9 +380,15 @@ def render_dashboard_content():
     else:
         filtered_targets = targets
 
+    # Status filter from KPI operational bar
+    sf = st.session_state.get("status_filter", "All")
+    if sf != "All":
+        filtered_targets = [t for t in filtered_targets if t["status"] == sf]
+
     # Summary calculations
     total_targets = len(targets)
     online_count = sum(1 for t in targets if t["status"] == "Online")
+    degraded_count = sum(1 for t in targets if t["status"] == "Degraded")
     offline_count = sum(1 for t in targets if t["status"] == "Offline")
     
     valid_rtts = [t["rtt_ms"] for t in targets if t["rtt_ms"] > 0]
@@ -302,52 +397,12 @@ def render_dashboard_content():
     avg_loss = sum(t["loss_pct"] for t in targets) / total_targets if total_targets else 2.4
     avail_pct = 100.0 - avg_loss
 
-    # Top utility row: Interactive Search bar on left, action controls & profile on right
-    search_col, actions_col = st.columns([1.1, 1.9])
-    with search_col:
-        search_query = st.text_input(
-            "Search target",
-            placeholder="🔍 Search target (IP or hostname)...",
-            value=st.session_state.get("search_query", ""),
-            label_visibility="collapsed"
-        )
-        st.session_state["search_query"] = search_query
-
-    with actions_col:
-        act_c1, act_c2, act_c3 = st.columns([0.8, 0.8, 3.2], gap="small")
-        with act_c1:
-            theme_icon = "☀️" if is_dark else "🌙"
-            if st.button(theme_icon, key="top_theme_btn", help="Toggle Light / Dark NOC Mode"):
-                st.session_state["dark_mode"] = not is_dark
-                st.rerun()
-        with act_c2:
-            with st.popover("🔔", help="Active Alerts & Quick Notifications"):
-                st.markdown("#### 🔔 System Notifications")
-                if anomalies:
-                    for a in anomalies:
-                        st.markdown(f"- **{a.get('name', 'Target')}**: {a.get('reason', 'Network issue')}")
-                else:
-                    st.success("All systems optimal. No active alerts.")
-                if st.button("View Anomaly Timeline →", key="pop_goto_alerts"):
-                    st.session_state["current_page"] = "Alerts"
-                    st.rerun()
-        with act_c3:
-            # Clickable Operator Profile Popover
-            with st.popover(f"👤 {curr_user_name} ▾", help="Operator Profile & Account Settings"):
-                st.markdown("### 🛡️ Operator Session")
-                st.markdown(f"**Name:** {curr_user_name}")
-                st.markdown(f"**Username:** `@{curr_user.get('username', 'dhanu')}`")
-                st.markdown(f"**Role:** `{curr_role}`")
-                st.markdown(f"**Email:** {curr_user.get('email', 'dhanu@telemetry.noc')}")
-                st.markdown("**Session:** 🟢 Active NOC Authorization")
-                st.divider()
-                if st.button("🚪 Sign Out", key="btn_logout", use_container_width=True):
-                    st.session_state["user"] = None
-                    st.toast("Signed out successfully.", icon="👋")
-                    st.rerun()
-
-    # Dynamic Greeting Banner with user name
-    st.html(render_hero_greeting(user_name=curr_user_name))
+    # Dynamic Greeting Banner with live state
+    st.html(render_hero_greeting(
+        user_name=curr_user_name,
+        is_live=st.session_state.get("auto_probe", False),
+        interval_sec=interval_sec
+    ))
 
     # 2-Column Responsive Layout
     col_main, col_side = st.columns([2.15, 1.0], gap="medium")
@@ -366,6 +421,32 @@ def render_dashboard_content():
             st.html(render_kpi_card_3(loss_pct=avg_loss, change_pct=-6.0))
         with kpi_cols[3]:
             st.html(render_kpi_card_4(avail_pct=avail_pct, change_pct=2.1))
+
+        # Operational Quick-Filter Pill Row
+        st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
+        kf_1, kf_2, kf_3, kf_4, kf_5 = st.columns([1.1, 1, 1, 1, 1.2])
+        with kf_1:
+            if st.button(f"🔍 All ({total_targets})", key="kf_all", use_container_width=True):
+                st.session_state["status_filter"] = "All"
+                st.rerun()
+        with kf_2:
+            if st.button(f"🟢 Online ({online_count})", key="kf_online", use_container_width=True):
+                st.session_state["status_filter"] = "Online"
+                st.rerun()
+        with kf_3:
+            if st.button(f"🟡 Degraded ({degraded_count})", key="kf_deg", use_container_width=True):
+                st.session_state["status_filter"] = "Degraded"
+                st.rerun()
+        with kf_4:
+            if st.button(f"🔴 Offline ({offline_count})", key="kf_off", use_container_width=True):
+                st.session_state["status_filter"] = "Offline"
+                st.rerun()
+        with kf_5:
+            if st.button("⚡ Probe All", key="kf_probe_all", use_container_width=True):
+                with st.spinner("Probing all targets in parallel..."):
+                    probe_all_targets()
+                    st.toast("⚡ All targets probed successfully!", icon="✅")
+                    st.rerun()
 
         # 2. Network Topology Card
         with st.container(border=True):
@@ -394,7 +475,7 @@ def render_dashboard_content():
                 )
                 st.session_state["map_view"] = map_tabs
 
-            if map_tabs == "World View" or map_tabs == "Region":
+            if map_tabs in ["World View", "Region"]:
                 map_fig = create_topology_map_figure(filtered_targets, view_mode=map_tabs, is_dark=is_dark)
                 st.plotly_chart(map_fig, use_container_width=True, config={"displayModeBar": False, "staticPlot": False})
             else:
@@ -490,10 +571,10 @@ def render_dashboard_content():
                 st.html(render_latency_progress_bars(targets))
 
     # ==========================
-    # COLUMN 2: COMPACT RIGHT PANEL (~30%)
+    # COLUMN 2: FULLY INTERACTIVE RIGHT PANEL (~30%)
     # ==========================
     with col_side:
-        # Card 1: Live Target Status
+        # Card 1: Live Target Status (WITH INTERACTIVE PING BUTTONS)
         with st.container(border=True):
             tgt_h_l, tgt_h_r = st.columns([2.3, 1.2])
             with tgt_h_l:
@@ -513,9 +594,25 @@ def render_dashboard_content():
                     st.session_state["current_page"] = "Targets"
                     st.rerun()
 
-            st.html(render_live_target_status_list(targets))
+            for idx, t in enumerate(targets):
+                tr_c1, tr_c2, tr_c3 = st.columns([2.2, 1.6, 1.2], gap="small")
+                with tr_c1:
+                    status_dot = "🟢" if t["status"] == "Online" else ("🟡" if t["status"] == "Degraded" else "🔴")
+                    st.markdown(f"{status_dot} **{t['name']}**  \n<span style='font-size:0.75rem; color:#64748b;'>{t.get('resolved_ip') or t['host']}</span>", unsafe_allow_html=True)
+                with tr_c2:
+                    st.markdown(f"**{int(round(t.get('rtt_ms', 0)))} ms**  \n<span style='font-size:0.75rem; color:#64748b;'>Loss: {t.get('loss_pct', 0):.1f}%</span>", unsafe_allow_html=True)
+                with tr_c3:
+                    if st.button("⚡ Ping", key=f"r_ping_{t['target_id']}_{idx}", help=f"Probe {t['name']} immediately"):
+                        res = collect_icmp_target(t['host'])
+                        rtt_v = res.get("data", {}).get("rtt_ms")
+                        if rtt_v:
+                            st.toast(f"⚡ {t['name']} responded in {rtt_v} ms!", icon="📶")
+                        else:
+                            st.toast(f"⚠️ {t['name']} probe timed out.", icon="⚠️")
+                        st.rerun()
+                st.markdown("<div style='height:2px; border-bottom:1px solid rgba(226, 232, 240, 0.4); margin:4px 0;'></div>", unsafe_allow_html=True)
 
-        # Card 2: Active Alerts
+        # Card 2: Active Alerts (WITH INTERACTIVE ACKNOWLEDGE / CLEAR BUTTONS)
         with st.container(border=True):
             alr_h_l, alr_h_r = st.columns([2.3, 1.2])
             with alr_h_l:
@@ -535,9 +632,28 @@ def render_dashboard_content():
                     st.session_state["current_page"] = "Alerts"
                     st.rerun()
 
-            st.html(render_active_alerts_list(anomalies))
+            if anomalies:
+                for idx, a in enumerate(anomalies):
+                    al_c1, al_c2 = st.columns([3.2, 1.4], gap="small")
+                    with al_c1:
+                        is_crit = "100%" in a.get("reason", "") or "timeout" in a.get("reason", "").lower()
+                        badge_color = "#ef4444" if is_crit else "#f59e0b"
+                        st.markdown(f"<span style='color:{badge_color}; font-weight:700;'>●</span> **{a.get('name', 'Host')}**  \n<span style='font-size:0.75rem; color:#64748b;'>{a.get('reason', 'Network anomaly')}</span>", unsafe_allow_html=True)
+                    with al_c2:
+                        if st.button("✅ Clear", key=f"r_ack_{a.get('id', idx)}", help="Acknowledge & resolve alert"):
+                            with get_connection() as conn:
+                                conn.execute("DELETE FROM anomalies WHERE id = ?", (a["id"],))
+                                conn.commit()
+                            st.toast(f"Alert #{a['id']} acknowledged and cleared.", icon="✅")
+                            st.rerun()
+                    st.markdown("<div style='height:2px; border-bottom:1px solid rgba(226, 232, 240, 0.4); margin:4px 0;'></div>", unsafe_allow_html=True)
+            else:
+                st.success("✅ Nominal status. 0 active alerts.")
+                if st.button("🔍 Run Anomaly Audit", key="r_run_audit_now", use_container_width=True):
+                    st.session_state["current_page"] = "Alerts"
+                    st.rerun()
 
-        # Card 3: Recent Activity
+        # Card 3: Recent Activity (WITH LINK TO PACKET LOG)
         with st.container(border=True):
             act_h_l, act_h_r = st.columns([2.3, 1.2])
             with act_h_l:
@@ -565,9 +681,9 @@ def render_dashboard_content():
 
 def render_targets_view():
     st.html("<h2 style='color:var(--text-primary);'>🎯 Network Targets Management</h2>")
-    st.caption("Inspect and configure active network monitoring targets stored in SQLite.")
+    st.caption("Inspect, probe, and register network monitoring targets stored in SQLite.")
     
-    t_act_col1, t_act_col2 = st.columns([1, 3])
+    t_act_col1, t_act_col2 = st.columns([1.2, 2.8])
     with t_act_col1:
         if st.button("⚡ Probe All Targets Now", use_container_width=True):
             with st.spinner("Probing targets in parallel..."):
@@ -578,13 +694,40 @@ def render_targets_view():
         t_search = st.text_input("Filter targets table", placeholder="Type name or host to filter...", label_visibility="collapsed")
 
     conn = get_connection()
-    query = "SELECT * FROM targets"
+    query = "SELECT target_id, name, host, resolved_ip, lat, lon, enabled, interval, timeout FROM targets"
     if t_search.strip():
         query += f" WHERE name LIKE '%{t_search.strip()}%' OR host LIKE '%{t_search.strip()}%'"
     df = pd.read_sql_query(query, conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
+
+    # Interactive Target Management Card
+    with st.container(border=True):
+        st.markdown("#### ⚡ Individual Target Actions")
+        targets_list = get_all_targets()
+        if targets_list:
+            target_names = {f"{t['name']} ({t['host']})": t for t in targets_list}
+            selected_label = st.selectbox("Select Target to Test or Manage", list(target_names.keys()))
+            sel_target = target_names[selected_label]
+
+            ac_1, ac_2 = st.columns(2)
+            with ac_1:
+                if st.button(f"⚡ Ping {sel_target['name']} Now", use_container_width=True):
+                    with st.spinner(f"Pinging {sel_target['name']}..."):
+                        res = collect_icmp_target(sel_target["host"])
+                        meas = res.get("data", {})
+                        if meas.get("rtt_ms"):
+                            st.success(f"✅ Host Responded: **{meas['rtt_ms']} ms** (TTL: {meas.get('ttl', 64)})")
+                        else:
+                            st.error(f"❌ Probe Failed: {meas.get('error', 'Request timed out')}")
+            with ac_2:
+                if st.button(f"🗑️ Delete {sel_target['name']}", use_container_width=True):
+                    with get_connection() as conn:
+                        conn.execute("DELETE FROM targets WHERE target_id = ?", (sel_target["target_id"],))
+                        conn.commit()
+                    st.toast(f"Target '{sel_target['name']}' removed from database.", icon="🗑️")
+                    st.rerun()
 
     with st.expander("➕ Add New Monitored Target", expanded=False):
         with st.form("new_target_form"):
@@ -619,15 +762,24 @@ def render_measurements_view():
     st.html("<h2 style='color:var(--text-primary);'>📊 Telemetry Measurements Log</h2>")
     st.caption("Raw ICMP / TCP packet-level telemetry records stored in SQLite database.")
     
-    m_col1, m_col2 = st.columns([1.5, 2.5])
+    m_col1, m_col2, m_col3 = st.columns([1.5, 1.5, 1.0])
     with m_col1:
         proto_filter = st.radio("Protocol Filter", ["All", "ICMP", "TCP"], horizontal=True)
+    with m_col2:
+        rec_limit = st.selectbox("Display Limit", [50, 100, 200, 500], index=1)
+    with m_col3:
+        if st.button("🧹 Clear Logs", use_container_width=True, help="Clear historical telemetry records"):
+            with get_connection() as conn:
+                conn.execute("DELETE FROM measurements")
+                conn.commit()
+            st.toast("Measurements table cleared.", icon="✅")
+            st.rerun()
 
     conn = get_connection()
     if proto_filter == "All":
-        df = pd.read_sql_query("SELECT * FROM measurements ORDER BY id DESC LIMIT 200", conn._conn)
+        df = pd.read_sql_query(f"SELECT * FROM measurements ORDER BY id DESC LIMIT {rec_limit}", conn._conn)
     else:
-        df = pd.read_sql_query(f"SELECT * FROM measurements WHERE protocol = '{proto_filter}' ORDER BY id DESC LIMIT 200", conn._conn)
+        df = pd.read_sql_query(f"SELECT * FROM measurements WHERE protocol = '{proto_filter}' ORDER BY id DESC LIMIT {rec_limit}", conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
@@ -737,11 +889,15 @@ def render_alerts_view():
 def render_reports_view():
     st.html("<h2 style='color:var(--text-primary);'>📄 Network Operations Center (NOC) Executive Report</h2>")
     
+    u_info = st.session_state.get("user", {})
+    u_name = u_info.get("full_name", "Dhanumithra")
+    u_role = u_info.get("role", "NOC Lead / Administrator")
+    
     report_text = f"""### NetTelemetry Computer Networks Implementation
-- **Operator Authorization:** Authenticated as {curr_user_name} ({curr_role}).
+- **Operator Authorization:** Authenticated as {u_name} ({u_role}).
 - **Active Probing vs Passive Sniffing:** Active ICMP and controlled TCP connection tests measure end-to-end user experience and immediate packet drops rather than passively waiting for third-party traffic.
 - **Statistical Jitter:** RFC 3550 style delay variation tracking consecutive RTT delta values:
-  $$\\text{Jitter} = \\frac{1}{N-1} \\sum_{i=1}^{N-1} |\\text{RTT}_i - \\text{RTT}_{i-1}|$$
+  $$\\text{{Jitter}} = \\frac{{1}}{{N-1}} \\sum_{{i=1}}^{{N-1}} |\\text{{RTT}}_{{i}} - \\text{{RTT}}_{{i-1}}|$$
 - **Latency Percentiles:** P95 and P99 latency percentiles identify path jitter and router bufferbloat that mean RTT averages obscure.
 - **Database Architecture:** SQLite in WAL mode with relational targets, telemetry measurements, window metrics, and anomaly events.
 """
@@ -775,12 +931,21 @@ def render_settings_view():
     loss_val = st.number_input("Packet Loss Warning Threshold (%)", value=float(st.session_state["thresh_loss"]))
     jitter_val = st.number_input("Jitter Threshold (ms)", value=float(st.session_state["thresh_jitter"]))
     
-    if st.button("💾 Save Settings", use_container_width=True):
-        st.session_state["thresh_rtt"] = rtt_val
-        st.session_state["thresh_loss"] = loss_val
-        st.session_state["thresh_jitter"] = jitter_val
-        st.toast("Settings saved successfully!", icon="✅")
-        st.success("✅ Telemetry thresholds updated and persisted in active session state.")
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        if st.button("💾 Save Settings", use_container_width=True):
+            st.session_state["thresh_rtt"] = rtt_val
+            st.session_state["thresh_loss"] = loss_val
+            st.session_state["thresh_jitter"] = jitter_val
+            st.toast("Settings saved successfully!", icon="✅")
+            st.success("✅ Telemetry thresholds updated and persisted in active session state.")
+    with col_s2:
+        if st.button("🔄 Reset to Defaults", use_container_width=True):
+            st.session_state["thresh_rtt"] = 90.0
+            st.session_state["thresh_loss"] = 5.0
+            st.session_state["thresh_jitter"] = 20.0
+            st.toast("Reset thresholds to default parameters.", icon="🔄")
+            st.rerun()
 
 
 # --- Main Router ---
