@@ -15,12 +15,15 @@ from database.db import (
     get_recent_measurements,
     get_active_anomalies,
     get_connection,
+    insert_target,
     DB_PATH
 )
 from telemetry.collector import probe_all_targets
 from dashboard.styles import get_custom_css
 from dashboard.components import (
     render_top_header,
+    render_top_header_actions,
+    render_hero_greeting,
     render_kpi_card_1,
     render_kpi_card_2,
     render_kpi_card_3,
@@ -410,15 +413,17 @@ def render_targets_view():
                 t_lon = st.number_input("Longitude", value=-74.0060)
             
             submitted = st.form_submit_button("Add Target to Network Monitor")
-            if submitted and t_id and t_name and t_host:
-                conn = get_connection()
-                cur = conn.cursor()
-                cur.execute("""
-                INSERT OR REPLACE INTO targets (target_id, name, host, resolved_ip, lat, lon, enabled, interval_sec, timeout_sec)
-                VALUES (?, ?, ?, ?, ?, ?, 1, 5, 2)
-                """, (t_id, t_name, t_host, t_host, t_lat, t_lon))
-                conn.commit()
-                conn.close()
+            if submitted and t_name and t_host:
+                insert_target({
+                    "name": t_name,
+                    "host": t_host,
+                    "resolved_ip": t_host,
+                    "lat": t_lat,
+                    "lon": t_lon,
+                    "enabled": True,
+                    "interval": 5,
+                    "timeout": 2
+                })
                 st.success(f"Added {t_name} successfully!")
                 st.rerun()
 

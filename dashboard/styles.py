@@ -238,6 +238,28 @@ footer {
     color: #94a3b8;
 }
 
+/* Explicit Streamlit text input styling override for search */
+div[data-testid="stTextInput"] div[data-baseweb="input"],
+div[data-testid="stTextInput"] div[data-baseweb="base-input"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    height: 38px !important;
+}
+
+div[data-testid="stTextInput"] input {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    font-size: 0.85rem !important;
+    border-radius: 20px !important;
+    padding: 0.35rem 0.85rem !important;
+}
+
+div[data-testid="stTextInput"] input::placeholder {
+    color: #94a3b8 !important;
+}
+
 .top-navbar-actions {
     display: flex;
     align-items: center;

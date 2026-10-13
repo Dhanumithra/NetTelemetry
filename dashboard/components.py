@@ -305,10 +305,21 @@ def create_topology_map_figure(targets: List[Dict[str, Any]]) -> go.Figure:
 
     # Add Target Nodes with custom status pins
     for t in targets:
-        tid = t.get("target_id", "").lower()
-        coords = coord_map.get(tid)
+        tid = str(t.get("target_id", "")).lower()
+        tname = str(t.get("name", "")).lower()
+        coords = coord_map.get(tid) or coord_map.get(tname)
         if not coords:
-            coords = {"lat": t.get("lat", 0.0), "lon": t.get("lon", 0.0), "name": t.get("name"), "ip": t.get("host")}
+            for k in coord_map:
+                if k in tname or k in str(t.get("host", "")):
+                    coords = coord_map[k]
+                    break
+        if not coords:
+            coords = {
+                "lat": float(t.get("lat") or 0.0),
+                "lon": float(t.get("lon") or 0.0),
+                "name": t.get("name", "Target"),
+                "ip": t.get("host", "")
+            }
 
         status = t.get("status", "Online")
         color = "#10b981" if status == "Online" else ("#f59e0b" if status == "Degraded" else "#ef4444")

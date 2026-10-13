@@ -382,6 +382,8 @@ def get_target_latest_status(db_path=DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
     return results
 
 def get_recent_measurements(db_path=DEFAULT_DB_PATH, limit: int = 15) -> List[Dict[str, Any]]:
+    if isinstance(db_path, int):
+        limit, db_path = db_path, DEFAULT_DB_PATH
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute('''
@@ -394,6 +396,8 @@ def get_recent_measurements(db_path=DEFAULT_DB_PATH, limit: int = 15) -> List[Di
         return rows
 
 def get_active_anomalies(db_path=DEFAULT_DB_PATH, limit: int = 10) -> List[Dict[str, Any]]:
+    if isinstance(db_path, int):
+        limit, db_path = db_path, DEFAULT_DB_PATH
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute('''
