@@ -1,15 +1,41 @@
 {
     "targets": [
         {
-            "name": "Localhost",
-            "host": "127.0.0.1",
+            "target_id": "google",
+            "name": "Google",
+            "host": "8.8.8.8",
             "enabled": true,
             "interval": 5,
             "timeout": 2
         },
         {
-            "name": "Google DNS",
-            "host": "8.8.8.8",
+            "target_id": "cloudflare",
+            "name": "Cloudflare",
+            "host": "1.1.1.1",
+            "enabled": true,
+            "interval": 5,
+            "timeout": 2
+        },
+        {
+            "target_id": "github",
+            "name": "GitHub",
+            "host": "140.82.121.3",
+            "enabled": true,
+            "interval": 5,
+            "timeout": 2
+        },
+        {
+            "target_id": "amazon",
+            "name": "Amazon",
+            "host": "52.94.126.1",
+            "enabled": true,
+            "interval": 5,
+            "timeout": 2
+        },
+        {
+            "target_id": "microsoft",
+            "name": "Microsoft",
+            "host": "20.190.164.4",
             "enabled": true,
             "interval": 5,
             "timeout": 2

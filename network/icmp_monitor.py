@@ -3,6 +3,11 @@ from ctypes import wintypes
 from datetime import datetime, timezone
 import socket
 import sys
+import subprocess
+import platform
+import re
+import time
+from typing import Dict, Any
 
 class IP_OPTION_INFORMATION(ctypes.Structure):
     _fields_ = [
@@ -51,13 +56,13 @@ else:
     iphlpapi = None
 
 
-def ip_to_dword(ip_str):
+def ip_to_dword(ip_str: str) -> int:
     """Convert IP string to 32-bit integer in network byte order."""
     packed = socket.inet_aton(ip_str)
     return ctypes.c_ulong.from_buffer_copy(packed).value
 
 
-def ping(ip_address, timeout_ms=1000, payload=b"NetTelemetry"):
+def ping(ip_address: str, timeout_ms: int = 1000, payload: bytes = b"NetTelemetry") -> Dict[str, Any]:
     """
     Send ICMP Echo request using Windows IcmpSendEcho via ctypes.
     Returns structured measurement dict matching project data contract.
@@ -124,7 +129,6 @@ def ping(ip_address, timeout_ms=1000, payload=b"NetTelemetry"):
                     "rtt_ms": float(reply.RoundTripTime),
                     "ttl": int(reply.Options.Ttl),
                     "error": None,
-                    # Backward compatibility fields
                     "ip": ip_address,
                     "status": "Success",
                     "bytes": reply.DataSize
@@ -139,7 +143,6 @@ def ping(ip_address, timeout_ms=1000, payload=b"NetTelemetry"):
                     "rtt_ms": None,
                     "ttl": None,
                     "error": "timeout" if reply.Status == 11010 else f"status_code_{reply.Status}",
-                    # Backward compatibility fields
                     "ip": ip_address,
                     "status": "Timeout",
                     "status_code": reply.Status
@@ -154,12 +157,62 @@ def ping(ip_address, timeout_ms=1000, payload=b"NetTelemetry"):
                 "rtt_ms": None,
                 "ttl": None,
                 "error": f"IcmpSendEcho returned 0, error code: {ctypes.GetLastError()}",
-                # Backward compatibility fields
                 "ip": ip_address,
                 "status": "Failed"
             }
     finally:
         IcmpCloseHandle(handle)
+
+
+def ping_target(host: str, timeout_sec: int = 2) -> Dict[str, Any]:
+    """
+    Performs an ICMP ping observation to the destination host.
+    Uses Win32 ICMP API and falls back to system ping utility if necessary.
+    """
+    # Try ctypes ping first if IP address
+    try:
+        resolved_ip = socket.gethostbyname(host)
+        res = ping(resolved_ip, timeout_ms=int(timeout_sec * 1000))
+        if res.get("success"):
+            return {
+                "success": True,
+                "rtt_ms": res.get("rtt_ms"),
+                "ttl": res.get("ttl"),
+                "error": None
+            }
+    except Exception:
+        pass
+
+    # Subprocess ping fallback
+    system = platform.system().lower()
+    start_time = time.time()
+    if system == "windows":
+        cmd = ["ping", "-n", "1", "-w", str(int(timeout_sec * 1000)), host]
+    else:
+        cmd = ["ping", "-c", "1", "-W", str(timeout_sec), host]
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout_sec + 2
+        )
+        elapsed_total = (time.time() - start_time) * 1000
+        output = proc.stdout
+
+        if proc.returncode == 0:
+            time_match = re.search(r"time[=<](\d+(?:\.\d+)?)\s*ms", output, re.IGNORECASE)
+            ttl_match = re.search(r"TTL=(\d+)", output, re.IGNORECASE)
+            rtt_ms = float(time_match.group(1)) if time_match else round(elapsed_total, 2)
+            ttl = int(ttl_match.group(1)) if ttl_match else 64
+            return {"success": True, "rtt_ms": rtt_ms, "ttl": ttl, "error": None}
+        else:
+            err = "Request timed out" if ("timeout" in output.lower() or "timed out" in output.lower()) else "Ping probe failed"
+            return {"success": False, "rtt_ms": None, "ttl": None, "error": err}
+    except Exception as e:
+        return {"success": False, "rtt_ms": None, "ttl": None, "error": str(e)}
 
 
 if __name__ == "__main__":

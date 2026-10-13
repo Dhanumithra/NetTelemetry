@@ -1,9 +1,15 @@
-from database.db import DEFAULT_DB_PATH, insert_measurement, insert_target, get_target_by_host
-from network.icmp_monitor import ping
+import time
+import datetime
+from typing import Dict, Any, List
+from database.db import DEFAULT_DB_PATH, DB_PATH, insert_measurement, insert_target, get_target_by_host, get_connection, init_db
+from network.icmp_monitor import ping, ping_target
 from network.target_manager import resolve_target
+from network.tcp_monitor import measure_tcp_connect
+from telemetry.metrics import calculate_rolling_statistics
+from analytics.anomaly_detector import AnomalyDetector
 
 
-def store_measurement(measurement_dict, db_path=DEFAULT_DB_PATH):
+def store_measurement(measurement_dict: Dict[str, Any], db_path: str = DEFAULT_DB_PATH) -> Dict[str, Any]:
     """
     Store a structured measurement dictionary into SQLite.
     Resolves/registers the target host/IP in the targets table if necessary.
@@ -15,7 +21,6 @@ def store_measurement(measurement_dict, db_path=DEFAULT_DB_PATH):
     # Ensure target exists in DB
     target_row = get_target_by_host(target_host, db_path)
     if not target_row:
-        # Auto-register target
         resolved_ip = resolve_target(target_host) or target_host
         target_id = insert_target({
             "name": target_host,
@@ -28,7 +33,6 @@ def store_measurement(measurement_dict, db_path=DEFAULT_DB_PATH):
     else:
         target_id = target_row["target_id"]
 
-    # Copy measurement dict and set target_id
     meas_data = dict(measurement_dict)
     meas_data["target_id"] = target_id
 
@@ -59,7 +63,6 @@ def collect_icmp_target(target_input, timeout_ms=1000, db_path=DEFAULT_DB_PATH):
 
     resolved_ip = resolve_target(host)
     if not resolved_ip:
-        # Handle unresolvable host
         target_id = insert_target({
             "name": name,
             "host": host,
@@ -70,7 +73,7 @@ def collect_icmp_target(target_input, timeout_ms=1000, db_path=DEFAULT_DB_PATH):
         }, db_path=db_path)
 
         meas_data = {
-            "timestamp": None,
+            "timestamp": datetime.datetime.now().isoformat(),
             "target": host,
             "protocol": "ICMP",
             "test_type": "echo",
@@ -81,10 +84,87 @@ def collect_icmp_target(target_input, timeout_ms=1000, db_path=DEFAULT_DB_PATH):
         }
         return store_measurement(meas_data, db_path=db_path)
 
-    # Perform ping
     meas_res = ping(resolved_ip, timeout_ms=timeout)
-    # Standardize target to original host/IP requested
     meas_res["target"] = host
-
-    # Store in database
     return store_measurement(meas_res, db_path=db_path)
+
+
+def probe_all_targets(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """
+    Executes a round of active probes across all enabled targets.
+    Records raw measurements in SQLite and checks for anomalies.
+    """
+    init_db(db_path)
+    detector = AnomalyDetector(rtt_threshold=90.0, loss_threshold=5.0, jitter_threshold=20.0)
+    results = []
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT target_id, name, host, timeout FROM targets WHERE enabled = 1")
+        targets = [dict(r) for r in cursor.fetchall()]
+
+        for target in targets:
+            tid = target["target_id"]
+            host = target["host"]
+            timeout = target.get("timeout") or 2
+
+            probe_res = ping_target(host, timeout_sec=timeout)
+
+            # TCP fallback check
+            if not probe_res["success"] and host in ["140.82.121.3", "52.94.126.1", "20.190.164.4"]:
+                tcp_res = measure_tcp_connect(host, 443, timeout=timeout)
+                if tcp_res["success"]:
+                    probe_res = {
+                        "success": True,
+                        "rtt_ms": tcp_res["rtt_ms"],
+                        "ttl": 64,
+                        "error": None
+                    }
+
+            cursor.execute('''
+            INSERT INTO measurements (timestamp, target_id, protocol, test_type, success, rtt_ms, ttl, error)
+            VALUES (datetime('now'), ?, 'ICMP', 'echo', ?, ?, ?, ?)
+            ''', (
+                tid,
+                1 if probe_res["success"] else 0,
+                probe_res.get("rtt_ms"),
+                probe_res.get("ttl"),
+                probe_res.get("error")
+            ))
+
+            cursor.execute('''
+            SELECT rtt_ms, success FROM measurements
+            WHERE target_id = ?
+            ORDER BY id DESC LIMIT 20
+            ''', (tid,))
+            recent = cursor.fetchall()
+            total = len(recent)
+            successful = sum(1 for r in recent if r["success"] == 1)
+            rtt_list = [r["rtt_ms"] for r in recent if r["success"] == 1 and r["rtt_ms"] is not None]
+
+            stats = calculate_rolling_statistics(rtt_list, total, successful)
+
+            anomaly = detector.detect(stats)
+            if anomaly:
+                cursor.execute('''
+                INSERT INTO anomalies (target_id, metric, observed_value, baseline, threshold, reason)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    str(tid),
+                    anomaly["metric"],
+                    anomaly["observed_value"],
+                    anomaly["baseline"],
+                    anomaly["threshold"],
+                    anomaly["reason"]
+                ))
+
+            results.append({
+                "target_id": tid,
+                "host": host,
+                "probe": probe_res,
+                "stats": stats
+            })
+
+        conn.commit()
+
+    return results

@@ -1,0 +1,330 @@
+NetTelemetry
+Computer Networks Implementation Plan, System Workflow & Two-Member Work Distribution
+1. Project Identity
+NetTelemetry is primarily a Computer Networks project. Its core purpose is to observe network communication and performance. Python, database storage, analytics and Streamlit are supporting technologies. The central flow is network communication → measurement → telemetry → network-performance analysis → anomaly identification → visualization.
+2. Core Networking Problem
+A network can be technically connected while providing poor communication quality. A destination may respond slowly, lose packets intermittently, show unstable delay or provide reduced throughput. NetTelemetry continuously observes these characteristics so performance degradation can be identified from measured network behaviour.
+3. Network-Focused Architecture
+Layer
+Component
+CN Role
+Network
+Gateway/servers/authorized hosts
+Real endpoints being measured
+Measurement
+ICMP Echo Request/Reply
+Reachability and RTT
+Transport test
+TCP/UDP sockets
+Transport-layer monitoring
+Packet observation
+RTT, timeout, TTL, response
+Network behaviour
+Metrics
+Loss, jitter, availability, throughput
+Performance indicators
+Storage
+Telemetry database
+Historical measurements
+Analytics
+Baseline/anomaly detector
+Unusual network conditions
+Presentation
+Streamlit dashboard
+Network monitoring view
+4. Complete Network Workflow
+1. Configure permitted IP addresses/hostnames, probe interval, timeout and optional TCP/UDP ports.
+2. Resolve hostnames when necessary and retain the resolved address for the observation.
+3. Send an ICMP Echo Request or perform a configured TCP/UDP test.
+4. The probe travels through the network path toward the destination and the response returns where applicable.
+5. Record the response or timeout, response time, status and available TTL information.
+6. Calculate RTT for successful ICMP observations.
+7. Calculate packet loss and availability over a measurement window.
+8. Calculate jitter from consecutive successful RTT observations.
+9. Run controlled TCP/UDP tests when enabled.
+10. Measure throughput only with a controlled transfer/test endpoint.
+11. Store timestamp, target, protocol, status, RTT, TTL, loss/jitter and other fields.
+12. Calculate rolling statistics and P95/P99 latency.
+13. Compare observations with the normal baseline and flag anomalies.
+14. Display current status, historical performance and anomaly events.
+15. Validate the system using controlled or replayable abnormal network conditions.
+5. ICMP Measurement — Core CN Module
+ICMP is the primary protocol for the core monitoring module. The collector sends an Echo Request; a reachable destination normally returns an Echo Reply. The elapsed time gives RTT. Repeated probes expose delay variation and packet loss. A timeout creates a failed observation. TTL can provide additional packet-level information when exposed by the operating system or measurement library.
+Echo Request → network path → destination → Echo Reply → return path
+Successful reply → RTT recorded
+No reply before timeout → failed probe
+Repeated failures → packet-loss percentage increases
+Changing RTT values → jitter can be derived
+TTL, when available → additional packet-level observation
+6. TCP/UDP Extension — Transport Layer
+After the ICMP module is stable, controlled transport-layer tests can strengthen the CN coverage. TCP can test connectivity to an explicitly configured service port and measure connection/response timing. UDP can use a controlled sender/receiver pair to observe delivery and timing. These tests must use authorized lab endpoints and are not intended for arbitrary Internet scanning.
+7. Network Metrics and Formulas
+Metric
+Calculation / Meaning
+RTT
+Response timestamp − request transmission timestamp
+Packet Loss %
+(Failed probes / total probes) × 100
+Availability %
+(Successful probes / total probes) × 100
+Jitter
+Average absolute difference between consecutive successful RTT values
+Throughput
+Transferred data / transfer duration
+P95/P99
+95th/99th percentile of latency observations
+8. Network Anomaly Examples
+Condition
+Telemetry
+Possible interpretation
+Sudden high RTT
+Latency rises sharply
+Possible congestion, load or path change
+Repeated packet loss
+Failed probes increase
+Possible unstable link, congestion, filtering or endpoint issue
+High jitter
+Delay varies substantially
+Unstable delay conditions
+Target unreachable
+Consecutive timeouts
+Endpoint/path unavailable or measurement blocked
+Throughput reduction
+Transfer rate falls
+Possible capacity/load/path issue in controlled test
+Sustained degradation
+Metrics stay abnormal
+Potential performance incident requiring investigation
+The system reports measured conditions; it does not claim a specific root cause unless independently established.
+9. Database Design — Network Telemetry
+Table
+Key Fields
+Purpose
+targets
+target_id, name, host, resolved_ip, enabled, interval, timeout
+Configured network endpoints
+measurements
+id, timestamp, target_id, protocol, test_type, success, rtt_ms, ttl, error
+Raw network observations
+window_metrics
+id, target_id, start_time, end_time, loss_pct, availability_pct, jitter_ms, p95_ms, p99_ms, throughput_mbps
+Aggregated network metrics
+anomalies
+id, timestamp, target_id, metric, observed_value, baseline, threshold, reason
+Detected network anomalies
+10. Dashboard — Network Operations View
+Reachable/unreachable target status
+Current RTT, packet loss, jitter and TTL
+RTT graph
+Packet-loss graph
+Jitter graph
+Availability percentage
+P95/P99 latency
+TCP/UDP results where enabled
+Controlled throughput graph
+Anomaly timeline
+Target/time filters
+11. Balanced Two-Member Work Split
+Both members receive substantial Computer Networks work. Neither member is assigned only documentation, database or UI work.
+Area
+Member 1 — Network Measurement
+Member 2 — Transport & Analytics
+Primary CN focus
+ICMP/network-layer monitoring
+TCP/UDP + performance analytics
+Network implementation
+ICMP probe/response, timeout, RTT, TTL
+Controlled TCP/UDP tests and throughput
+Metrics
+Raw RTT, probe status, basic loss
+Jitter, availability, P95/P99, throughput
+Anomaly work
+Connectivity/measurement events
+Baseline and statistical anomaly engine
+Storage
+Measurement schema and ingestion
+Aggregated metrics/anomaly storage
+Dashboard
+Supplies network-status data interface
+Builds network-performance dashboard
+Testing
+ICMP reachability/timeout/loss/RTT
+TCP/UDP/metric/anomaly/dashboard tests
+Documentation
+ICMP, IP, RTT, TTL, loss
+TCP/UDP, metrics, anomaly, dashboard
+Viva
+Packet/response and network measurement flow
+Transport tests, performance and anomaly analysis
+Shared
+Integration, final testing, report, PPT, demo
+Integration, final testing, report, PPT, demo
+12. Member 1 — Detailed Tasks
+Set up Python/network test environment
+Create authorized target configuration
+Implement target resolution and validation
+Implement ICMP measurement
+Handle timeout/unreachable/error cases
+Capture RTT and available TTL
+Record successful/failed probes
+Implement basic loss and availability windows
+Create measurement schema and insertion functions
+Provide data interface to Member 2
+Test normal/timeout/unreachable ICMP cases
+Document ICMP, packet flow, RTT and loss
+13. Member 2 — Detailed Tasks
+Implement controlled TCP connectivity/response-time testing
+Implement controlled UDP sender/receiver test if included
+Implement throughput test with controlled endpoint
+Calculate jitter
+Calculate rolling statistics and P95/P99
+Implement statistical anomaly detection
+Store anomaly reason/baseline/threshold
+Build Streamlit network dashboard
+Add status cards, charts, filters and anomaly timeline
+Test transport modules, metrics and dashboard
+Document TCP/UDP, metrics, anomaly detection and dashboard
+14. Shared Integration Contract
+Field
+Example
+Meaning
+timestamp
+2026-09-28 12:30:05
+Measurement time
+target
+192.168.1.1
+Destination
+protocol
+ICMP
+Protocol used
+test_type
+echo
+Test type
+success
+true/false
+Valid response status
+rtt_ms
+12.4
+Round-trip delay
+ttl
+64
+Observed TTL when available
+error
+timeout/null
+Failure reason
+15. Suggested Project Structure
+NetTelemetry/├── network/│   ├── target_manager.py│   ├── icmp_monitor.py│   ├── tcp_monitor.py│   └── udp_monitor.py├── telemetry/│   ├── collector.py│   └── metrics.py├── database/│   ├── schema.sql│   └── db.py├── analytics/│   └── anomaly_detector.py├── dashboard/│   └── app.py├── tests/│   ├── test_icmp.py│   ├── test_tcp_udp.py│   ├── test_metrics.py│   └── test_anomaly.py├── data/├── config.json├── requirements.txt└── README.md
+16. Development Plan
+Phase
+Work
+Owner
+1
+Select authorized targets, protocols and architecture
+Both
+2
+ICMP reachability, RTT, timeout, TTL, loss
+Member 1
+3
+Network telemetry schema and ingestion
+Member 1
+4
+Controlled TCP/UDP tests
+Member 2
+5
+Jitter, availability, percentiles, throughput
+Member 2
+6
+Network baseline and anomaly detection
+Member 2
+7
+Network dashboard
+Member 2 + Member 1 interface
+8
+End-to-end integration
+Both
+9
+Network-focused testing
+Both
+10
+Report, PPT, screenshots, demo, viva
+Both
+17. Network-Centric Test Plan
+Test
+Setup
+Expected Result
+Reachable target
+Permitted gateway/server
+Echo reply and RTT recorded
+Unreachable target
+Permitted inactive test target
+Timeouts; loss/availability change
+High delay
+Controlled/replayable delayed data
+RTT rises; anomaly can flag deviation
+Packet loss
+Controlled/replayable loss
+Loss percentage rises
+Jitter
+Variable-delay test/replay
+Jitter increases
+TCP service
+Authorized local/lab TCP service
+Connection/response measurement
+UDP test
+Controlled sender/receiver
+Delivery/timing observations
+Throughput
+Controlled transfer endpoint
+Transfer rate calculated
+Normal variation
+Naturally varying measurements
+Small fluctuations not all flagged
+Dashboard filter
+Target/time selection
+Corresponding telemetry shown
+18. Important CN Limitations for Viva
+ICMP RTT is not application response time.
+ICMP may be blocked or rate-limited; timeout does not always prove the whole path is down.
+Ping does not directly measure throughput.
+TTL depends on implementation/path and is not a complete topology map.
+Probe packet loss represents the observation made by that probe, not necessarily every application.
+TCP/UDP tests must use authorized endpoints.
+An anomaly means unusual measured behaviour; it does not automatically identify the root cause.
+19. How to Defend the CN Focus
+If asked whether this is only a data-analytics project, explain: “The data is generated directly from network communication. We measure ICMP/TCP/UDP behaviour, observe packet responses and timeouts, calculate RTT, packet loss, jitter, TTL, availability and throughput, and detect abnormal network conditions. The database, Python analytics and dashboard are supporting components used to process and present network telemetry.”
+20. Final Demonstration Flow
+1. Show configured network targets.
+2. Explain ICMP Echo Request → Echo Reply.
+3. Start collector and show RTT observations.
+4. Show timeout/unreachable observation and packet loss.
+5. Display RTT, loss, jitter, TTL and availability.
+6. Run controlled TCP/UDP test if included.
+7. Show throughput test if included.
+8. Show stored network telemetry.
+9. Open dashboard and show network graphs.
+10. Demonstrate controlled/replayed abnormal condition.
+11. Explain anomaly using the measured metric.
+12. Conclude with limitations and future network-monitoring extensions.
+21. Expected Deliverables
+Working network-monitoring application
+ICMP monitoring module
+Optional TCP/UDP test modules
+Network telemetry database
+Performance metric engine
+Anomaly detector
+Streamlit network dashboard
+Test cases/results
+Network architecture/workflow diagram
+Report, PPT and demo
+22. Future Scope
+SNMP device/interface monitoring
+Traceroute/path analysis
+Multi-router or multi-site monitoring
+Real-time network alerts
+Capacity planning
+Advanced ML anomaly detection
+Network topology visualization
+Application-aware TCP monitoring
+Long-term time-series telemetry
+23. Viva One-Liner
+“NetTelemetry is a Computer Networks monitoring system that actively measures authorized network endpoints using ICMP and controlled TCP/UDP tests, collects RTT, packet loss, jitter, TTL, availability and throughput telemetry, detects abnormal network behaviour, and visualizes the results for network-performance analysis.”

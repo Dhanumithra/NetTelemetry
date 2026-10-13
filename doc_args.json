@@ -1,7 +1,7 @@
 {
-    "filename": "docs/Task10_11_Testing_and_Documentation.docx",
-    "title": "Task 10 & 11: Testing and Final Documentation",
-    "objective": "The objective of these tasks is to ensure the reliability of the transport modules and metrics calculations through unit testing, and to wrap up the project with comprehensive documentation as requested.",
-    "what_done": "I wrote a test suite in 'tests/test_member2.py' using Python's built-in 'unittest' framework. It includes tests for the TCP connection module (testing both successful connections and timeouts) and the metrics engine (verifying rolling statistics and jitter logic). The tests act as proof that the underlying network functions work correctly. I also implemented an automated script 'create_doc.py' to generate all the required .docx documentation files in the 'docs' directory for each task.",
-    "result": "The core transport and analytics logic developed by Member 2 is now thoroughly tested and verified. The complete workflow is accompanied by professional .docx documentation for every task, fulfilling the academic and technical requirements for a highly impressive, resume-worthy project."
+    "filename": "docs/Task7_Storage_Metrics_Anomalies.docx",
+    "title": "Task 7: Store Aggregated Metrics and Anomalies",
+    "objective": "The objective of this task is to persistently store the calculated rolling statistics and the details of any detected network anomalies into a database. This allows for historical analysis and dashboard visualization.",
+    "what_done": "I developed 'db_m2.py' inside the 'database' directory. It uses Python's built-in SQLite library to initialize the necessary tables ('window_metrics' and 'anomalies'). I created functions to securely insert aggregated metrics (like loss_pct, p95_ms, and jitter) and to log the specific reason, threshold, and baseline whenever an anomaly is detected.",
+    "result": "The network data and generated alerts are now safely saved to a database table. The system can retrieve this historical telemetry at any point to show trends over time on the Streamlit dashboard."
 }
