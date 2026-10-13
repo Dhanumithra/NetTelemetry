@@ -312,7 +312,7 @@ def render_universal_top_navbar():
         st.session_state["search_query"] = search_query
 
     with actions_col:
-        act_c1, act_c2, act_c3 = st.columns([0.8, 1.0, 2.5], gap="small")
+        act_c1, act_c2, act_c3 = st.columns([0.65, 0.95, 2.6], gap="small")
         with act_c1:
             theme_icon = "☀️" if is_dark else "🌙"
             if st.button(theme_icon, key="top_theme_btn", help="Toggle Light / Dark NOC Mode"):
@@ -454,7 +454,7 @@ def render_dashboard_content():
             with map_hdr_l:
                 st.html("""
                 <div style="display:flex; align-items:center; gap:8px; padding-top:4px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="18" cy="5" r="3"></circle>
                         <circle cx="6" cy="12" r="3"></circle>
                         <circle cx="18" cy="19" r="3"></circle>
@@ -507,7 +507,7 @@ def render_dashboard_content():
                 with perf_hdr_l:
                     st.html("""
                     <div style="display:flex; align-items:center; gap:6px; padding-top:4px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                             <polyline points="17 6 23 6 23 12"></polyline>
                         </svg>
@@ -533,7 +533,7 @@ def render_dashboard_content():
                 st.html("""
                 <div class="card-title-bar">
                     <div class="card-title-left">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
                             <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
                         </svg>
@@ -546,10 +546,10 @@ def render_dashboard_content():
                 st.plotly_chart(donut_fig, use_container_width=True, config={"displayModeBar": False})
 
                 st.html("""
-                <div style="font-size: 0.75rem; color:#64748b; margin-top:-6px; display:flex; flex-direction:column; gap:4px; padding-left:12px;">
-                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981;"></span><span>Successful: <b style="color:#1e293b;">1,217</b></span></div>
-                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#f43f5e;"></span><span>Failed: <b style="color:#1e293b;">29</b></span></div>
-                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span><span>Packet Loss: <b style="color:#1e293b;">2.4%</b></span></div>
+                <div style="font-size: 0.75rem; margin-top:-6px; display:flex; flex-direction:column; gap:4px; padding-left:12px;">
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981;"></span><span class="meta-subtext">Successful: <b class="stat-highlight">1,217</b></span></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#f43f5e;"></span><span class="meta-subtext">Failed: <b class="stat-highlight">29</b></span></div>
+                    <div style="display:flex; align-items:center; gap:6px;"><span style="width:7px; height:7px; border-radius:50%; background:#94a3b8;"></span><span class="meta-subtext">Packet Loss: <b class="stat-highlight">2.4%</b></span></div>
                 </div>
                 """)
 
@@ -559,7 +559,7 @@ def render_dashboard_content():
                 st.html("""
                 <div class="card-title-bar" style="margin-bottom: 0.75rem;">
                     <div class="card-title-left">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="20" x2="18" y2="10"></line>
                             <line x1="12" y1="20" x2="12" y2="4"></line>
                             <line x1="6" y1="20" x2="6" y2="14"></line>
@@ -581,7 +581,7 @@ def render_dashboard_content():
                 st.html("""
                 <div class="card-title-bar" style="margin-bottom:0;">
                     <div class="card-title-left">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="2" width="20" height="20" rx="4"></rect>
                             <circle cx="12" cy="12" r="3"></circle>
                         </svg>
@@ -598,9 +598,9 @@ def render_dashboard_content():
                 tr_c1, tr_c2, tr_c3 = st.columns([2.2, 1.6, 1.2], gap="small")
                 with tr_c1:
                     status_dot = "🟢" if t["status"] == "Online" else ("🟡" if t["status"] == "Degraded" else "🔴")
-                    st.markdown(f"{status_dot} **{t['name']}**  \n<span style='font-size:0.75rem; color:#64748b;'>{t.get('resolved_ip') or t['host']}</span>", unsafe_allow_html=True)
+                    st.markdown(f"{status_dot} **{t['name']}**  \n<span class='meta-subtext' style='font-size:0.75rem;'>{t.get('resolved_ip') or t['host']}</span>", unsafe_allow_html=True)
                 with tr_c2:
-                    st.markdown(f"**{int(round(t.get('rtt_ms', 0)))} ms**  \n<span style='font-size:0.75rem; color:#64748b;'>Loss: {t.get('loss_pct', 0):.1f}%</span>", unsafe_allow_html=True)
+                    st.markdown(f"**{int(round(t.get('rtt_ms', 0)))} ms**  \n<span class='meta-subtext' style='font-size:0.75rem;'>Loss: {t.get('loss_pct', 0):.1f}%</span>", unsafe_allow_html=True)
                 with tr_c3:
                     if st.button("⚡ Ping", key=f"r_ping_{t['target_id']}_{idx}", help=f"Probe {t['name']} immediately"):
                         res = collect_icmp_target(t['host'])
@@ -638,7 +638,7 @@ def render_dashboard_content():
                     with al_c1:
                         is_crit = "100%" in a.get("reason", "") or "timeout" in a.get("reason", "").lower()
                         badge_color = "#ef4444" if is_crit else "#f59e0b"
-                        st.markdown(f"<span style='color:{badge_color}; font-weight:700;'>●</span> **{a.get('name', 'Host')}**  \n<span style='font-size:0.75rem; color:#64748b;'>{a.get('reason', 'Network anomaly')}</span>", unsafe_allow_html=True)
+                        st.markdown(f"<span style='color:{badge_color}; font-weight:700;'>●</span> **{a.get('name', 'Host')}**  \n<span class='meta-subtext' style='font-size:0.75rem;'>{a.get('reason', 'Network anomaly')}</span>", unsafe_allow_html=True)
                     with al_c2:
                         if st.button("✅ Clear", key=f"r_ack_{a.get('id', idx)}", help="Acknowledge & resolve alert"):
                             with get_connection() as conn:
@@ -660,7 +660,7 @@ def render_dashboard_content():
                 st.html("""
                 <div class="card-title-bar" style="margin-bottom:0;">
                     <div class="card-title-left">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                         </svg>
                         <span class="card-title-text">Recent Activity</span>
