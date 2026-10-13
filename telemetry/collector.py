@@ -89,9 +89,35 @@ def collect_icmp_target(target_input, timeout_ms=1000, db_path=DEFAULT_DB_PATH):
     return store_measurement(meas_res, db_path=db_path)
 
 
+from concurrent.futures import ThreadPoolExecutor
+
+def _probe_single_target(target: Dict[str, Any]) -> Dict[str, Any]:
+    tid = target["target_id"]
+    host = target["host"]
+    timeout = min(float(target.get("timeout") or 1.2), 1.2)
+
+    probe_res = ping_target(host, timeout_sec=timeout)
+
+    # TCP fallback check
+    if not probe_res["success"] and host in ["140.82.121.3", "52.94.126.1", "20.190.164.4"]:
+        tcp_res = measure_tcp_connect(host, 443, timeout=timeout)
+        if tcp_res["success"]:
+            probe_res = {
+                "success": True,
+                "rtt_ms": tcp_res["rtt_ms"],
+                "ttl": 64,
+                "error": None
+            }
+    return {
+        "target_id": tid,
+        "host": host,
+        "probe": probe_res
+    }
+
+
 def probe_all_targets(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
     """
-    Executes a round of active probes across all enabled targets.
+    Executes a round of active probes across all enabled targets concurrently.
     Records raw measurements in SQLite and checks for anomalies.
     """
     init_db(db_path)
@@ -103,23 +129,18 @@ def probe_all_targets(db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
         cursor.execute("SELECT target_id, name, host, timeout FROM targets WHERE enabled = 1")
         targets = [dict(r) for r in cursor.fetchall()]
 
-        for target in targets:
-            tid = target["target_id"]
-            host = target["host"]
-            timeout = target.get("timeout") or 2
+        if not targets:
+            return []
 
-            probe_res = ping_target(host, timeout_sec=timeout)
+        # Execute network pings in parallel
+        max_workers = min(len(targets), 8)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            probed_list = list(executor.map(_probe_single_target, targets))
 
-            # TCP fallback check
-            if not probe_res["success"] and host in ["140.82.121.3", "52.94.126.1", "20.190.164.4"]:
-                tcp_res = measure_tcp_connect(host, 443, timeout=timeout)
-                if tcp_res["success"]:
-                    probe_res = {
-                        "success": True,
-                        "rtt_ms": tcp_res["rtt_ms"],
-                        "ttl": 64,
-                        "error": None
-                    }
+        for item in probed_list:
+            tid = item["target_id"]
+            host = item["host"]
+            probe_res = item["probe"]
 
             cursor.execute('''
             INSERT INTO measurements (timestamp, target_id, protocol, test_type, success, rtt_ms, ttl, error)

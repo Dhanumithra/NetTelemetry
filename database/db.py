@@ -20,6 +20,11 @@ class DBConnectionWrapper:
         self._conn = sqlite3.connect(db_path, timeout=30.0)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON;")
+        try:
+            self._conn.execute("PRAGMA journal_mode = WAL;")
+            self._conn.execute("PRAGMA synchronous = NORMAL;")
+        except Exception:
+            pass
 
     def __enter__(self):
         return self._conn

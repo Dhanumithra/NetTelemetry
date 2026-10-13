@@ -274,7 +274,7 @@ def render_kpi_card_4(avail_pct: float = 97.6, change_pct: float = 2.1) -> str:
 
 # --- Network Topology Map ---
 
-def create_topology_map_figure(targets: List[Dict[str, Any]]) -> go.Figure:
+def create_topology_map_figure(targets: List[Dict[str, Any]], view_mode: str = "World View", is_dark: bool = False) -> go.Figure:
     fig = go.Figure()
 
     # Predefined node coordinates
@@ -329,6 +329,7 @@ def create_topology_map_figure(targets: List[Dict[str, Any]]) -> go.Figure:
 
         status = t.get("status", "Online")
         color = "#10b981" if status == "Online" else ("#f59e0b" if status == "Degraded" else "#ef4444")
+        text_color = "#f8fafc" if is_dark else "#1e293b"
 
         # Pin marker
         fig.add_trace(go.Scattergeo(
@@ -342,49 +343,75 @@ def create_topology_map_figure(targets: List[Dict[str, Any]]) -> go.Figure:
             ),
             text=[f"  <b>{coords['name']}</b><br>  {coords['ip']}"],
             textposition="top right",
-            textfont=dict(family="Inter, sans-serif", size=10, color="#1e293b"),
+            textfont=dict(family="Inter, sans-serif", size=10, color=text_color),
             hoverinfo="text",
             hovertext=f"<b>{coords['name']}</b> ({coords['ip']})<br>Status: {status}<br>RTT: {t.get('rtt_ms', 0)} ms<br>Loss: {t.get('loss_pct', 0)}%",
             showlegend=False
         ))
 
+    # Adaptive theme and projection
+    proj_type = "conic conformal" if view_mode == "Region" else "natural earth"
+    land_c = "#1e293b" if is_dark else "#dbe4ed"
+    ocean_c = "#0f172a" if is_dark else "#f8fafc"
+    country_c = "#334155" if is_dark else "#cbd5e1"
+    bg_c = "#111827" if is_dark else "#ffffff"
+
     fig.update_geos(
-        projection_type="natural earth",
+        projection_type=proj_type,
         showland=True,
-        landcolor="#dbe4ed",
+        landcolor=land_c,
         showocean=True,
-        oceancolor="#f8fafc",
+        oceancolor=ocean_c,
         showcountries=True,
-        countrycolor="#cbd5e1",
+        countrycolor=country_c,
         countrywidth=0.6,
         showcoastlines=True,
-        coastlinecolor="#cbd5e1",
+        coastlinecolor=country_c,
         showframe=False,
-        bgcolor="#ffffff"
+        bgcolor=bg_c
     )
 
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
         height=320,
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
-        dragmode=False
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        dragmode=False,
+        uirevision="topology_map"
     )
 
     return fig
 
 # --- Bottom Grid: Performance Trends Multi-Line Chart ---
 
-def create_performance_trends_figure(df: Optional[pd.DataFrame] = None) -> go.Figure:
+def create_performance_trends_figure(df: Optional[pd.DataFrame] = None, timeframe: str = "1h", is_dark: bool = False) -> go.Figure:
     fig = go.Figure()
 
     if df is None or df.empty:
-        # Default mock 1h trend matching mockup
-        timestamps = [f"10:{45+i*5}" if 45+i*5 < 60 else f"11:{45+i*5-60:02d}" for i in range(13)]
-        rtt_vals = [32, 28, 30, 36, 42, 38, 35, 40, 34, 31, 33, 35, 32]
-        loss_vals = [2, 1, 0, 4, 3, 2, 1, 5, 2, 1, 0, 2, 2]
-        jitter_vals = [4, 3, 5, 8, 9, 7, 5, 11, 6, 4, 3, 5, 4]
-        tput_vals = [45, 52, 60, 48, 70, 85, 62, 90, 75, 68, 80, 115, 65]
+        if timeframe == "6h":
+            timestamps = ["06:00", "06:30", "07:00", "07:30", "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00"]
+            rtt_vals = [28, 29, 34, 45, 52, 48, 36, 32, 30, 33, 35, 34, 31]
+            loss_vals = [1, 1, 2, 6, 8, 5, 2, 1, 1, 2, 2, 1, 1]
+            jitter_vals = [3, 4, 6, 12, 15, 9, 5, 4, 3, 5, 4, 3, 3]
+            tput_vals = [40, 42, 55, 60, 68, 75, 82, 90, 85, 78, 88, 95, 70]
+        elif timeframe == "24h":
+            timestamps = ["00:00", "02:00", "04:00", "06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00", "24:00"]
+            rtt_vals = [25, 24, 24, 26, 38, 44, 48, 50, 46, 39, 32, 29, 27]
+            loss_vals = [0, 0, 0, 1, 3, 5, 4, 6, 4, 2, 1, 0, 0]
+            jitter_vals = [2, 2, 2, 4, 8, 11, 10, 12, 9, 6, 3, 2, 2]
+            tput_vals = [30, 25, 20, 35, 70, 95, 110, 105, 98, 85, 65, 45, 35]
+        elif timeframe == "7d":
+            timestamps = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            rtt_vals = [31, 34, 42, 38, 48, 28, 26]
+            loss_vals = [1.8, 2.1, 4.5, 3.2, 5.8, 1.2, 0.9]
+            jitter_vals = [3.5, 4.0, 7.8, 5.2, 9.4, 2.5, 2.0]
+            tput_vals = [72, 78, 85, 80, 92, 58, 50]
+        else: # 1h default
+            timestamps = [f"10:{45+i*5}" if 45+i*5 < 60 else f"11:{45+i*5-60:02d}" for i in range(13)]
+            rtt_vals = [32, 28, 30, 36, 42, 38, 35, 40, 34, 31, 33, 35, 32]
+            loss_vals = [2, 1, 0, 4, 3, 2, 1, 5, 2, 1, 0, 2, 2]
+            jitter_vals = [4, 3, 5, 8, 9, 7, 5, 11, 6, 4, 3, 5, 4]
+            tput_vals = [45, 52, 60, 48, 70, 85, 62, 90, 75, 68, 80, 115, 65]
     else:
         timestamps = df["time_label"].tolist() if "time_label" in df.columns else df.index.tolist()
         rtt_vals = df["rtt_ms"].tolist()
@@ -432,19 +459,24 @@ def create_performance_trends_figure(df: Optional[pd.DataFrame] = None) -> go.Fi
         hovertemplate="%{y:.1f} Mbps"
     ))
 
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
     fig.update_layout(
         margin=dict(l=25, r=10, t=10, b=25),
         height=220,
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
         hovermode="x unified",
+        uirevision="trends",
         legend=dict(
             orientation="h",
             yanchor="top",
             y=-0.2,
             xanchor="center",
             x=0.5,
-            font=dict(size=10, color="#64748b")
+            font=dict(size=10, color=text_c)
         ),
         xaxis=dict(
             showgrid=False,
@@ -453,7 +485,7 @@ def create_performance_trends_figure(df: Optional[pd.DataFrame] = None) -> go.Fi
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor="#f1f5f9",
+            gridcolor=grid_c,
             color="#94a3b8",
             range=[0, 150],
             tickfont=dict(size=9)
@@ -464,12 +496,15 @@ def create_performance_trends_figure(df: Optional[pd.DataFrame] = None) -> go.Fi
 
 # --- Bottom Grid: Packet Loss & Availability Donut Chart ---
 
-def create_availability_donut_figure(avail_pct: float = 97.6, successful: int = 1217, failed: int = 29) -> go.Figure:
+def create_availability_donut_figure(avail_pct: float = 97.6, successful: int = 1217, failed: int = 29, is_dark: bool = False) -> go.Figure:
     fig = go.Figure()
 
     labels = ["Successful", "Failed"]
     values = [successful, failed]
     colors = ["#10b981", "#f43f5e"]
+    bg_c = "#111827" if is_dark else "#ffffff"
+    text_c = "#f8fafc" if is_dark else "#0f172a"
+    sub_c = "#94a3b8" if is_dark else "#64748b"
 
     fig.add_trace(go.Pie(
         labels=labels,
@@ -484,15 +519,16 @@ def create_availability_donut_figure(avail_pct: float = 97.6, successful: int = 
     fig.update_layout(
         annotations=[
             dict(
-                text=f"<b>{avail_pct:.1f}%</b><br><span style='font-size:11px;color:#64748b;'>Availability</span>",
+                text=f"<b>{avail_pct:.1f}%</b><br><span style='font-size:11px;color:{sub_c};'>Availability</span>",
                 x=0.5, y=0.5,
-                font=dict(size=18, family="Inter, sans-serif", color="#0f172a"),
+                font=dict(size=18, family="Inter, sans-serif", color=text_c),
                 showarrow=False
             )
         ],
         margin=dict(l=0, r=0, t=0, b=0),
         height=190,
-        paper_bgcolor="#ffffff"
+        paper_bgcolor=bg_c,
+        uirevision="donut"
     )
 
     return fig

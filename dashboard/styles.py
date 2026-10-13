@@ -3,8 +3,52 @@ CSS and Visual Design System for NetTelemetry NOC Dashboard.
 Strictly translates image_1.png into modern, enterprise-grade styles.
 """
 
-def get_custom_css() -> str:
-    return """
+DARK_MODE_CSS = """
+<style>
+:root {
+    --bg-main: #0b1120;
+    --sidebar-bg: #070e1b;
+    --sidebar-card: #0f172a;
+    --card-bg: #111827;
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-teal: #14b8a6;
+}
+body, .stApp {
+    background-color: #0b1120 !important;
+    color: #f8fafc !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"], .kpi-card {
+    background: #111827 !important;
+    border-color: rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4) !important;
+}
+.hero-main-title, .card-title-text, .target-name, .alert-target-title, .kpi-value {
+    color: #f8fafc !important;
+}
+.target-status-row:hover {
+    background: #1e293b !important;
+}
+div[data-testid="stTextInput"] div[data-baseweb="input"],
+div[data-testid="stTextInput"] input {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}
+.top-action-btn, .user-profile-capsule {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+.user-name-text {
+    color: #f8fafc !important;
+}
+</style>
+"""
+
+BASE_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -1024,5 +1068,63 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p
         margin-left: auto !important;
     }
 }
+
+/* Circular Top Action Header Buttons */
+button[key="top_theme_btn"],
+div[data-testid="column"]:has(button[key="top_theme_btn"]) button,
+div[data-testid="stPopover"] > button {
+    width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    min-width: 38px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    font-size: 1.1rem !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+button[key="top_theme_btn"]:hover,
+div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover,
+div[data-testid="stPopover"] > button:hover {
+    border-color: #cbd5e1 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Card Header 'View All →' Links */
+button[key^="view_all_"],
+button:has(p:contains("View All →")) {
+    background: transparent !important;
+    border: none !important;
+    color: #0d9488 !important;
+    font-size: 0.775rem !important;
+    font-weight: 600 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    height: auto !important;
+    min-height: unset !important;
+    cursor: pointer !important;
+}
+
+button[key^="view_all_"]:hover,
+button:has(p:contains("View All →")):hover {
+    color: #047857 !important;
+    text-decoration: underline !important;
+    background: transparent !important;
+}
 </style>
 """
+
+def get_custom_css(dark_mode: bool = False) -> str:
+    if dark_mode:
+        return BASE_CSS + "\n" + DARK_MODE_CSS
+    return BASE_CSS
+

@@ -19,10 +19,11 @@ from database.db import (
     DB_PATH
 )
 from telemetry.collector import probe_all_targets
+from telemetry.metrics import calculate_rolling_statistics
+from analytics.anomaly_detector import AnomalyDetector
 from dashboard.styles import get_custom_css
 from dashboard.components import (
     render_top_header,
-    render_top_header_actions,
     render_hero_greeting,
     render_kpi_card_1,
     render_kpi_card_2,
@@ -47,13 +48,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Inject Design System & CSS
-st.markdown(get_custom_css(), unsafe_allow_html=True)
-
-# 3. Ensure Database is seeded
-seed_default_data()
-
-# 4. Session State for Navigation & Filters
+# 2. Session State for Navigation, Theme & Settings
+if "dark_mode" not in st.session_state:
+    st.session_state["dark_mode"] = False
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "Dashboard"
 if "trend_timeframe" not in st.session_state:
@@ -62,6 +59,25 @@ if "map_view" not in st.session_state:
     st.session_state["map_view"] = "World View"
 if "search_query" not in st.session_state:
     st.session_state["search_query"] = ""
+if "thresh_rtt" not in st.session_state:
+    st.session_state["thresh_rtt"] = 90.0
+if "thresh_loss" not in st.session_state:
+    st.session_state["thresh_loss"] = 5.0
+if "thresh_jitter" not in st.session_state:
+    st.session_state["thresh_jitter"] = 20.0
+
+is_dark = st.session_state["dark_mode"]
+
+# 3. Inject Design System & CSS
+st.markdown(get_custom_css(dark_mode=is_dark), unsafe_allow_html=True)
+
+# 4. Initialize Database Exactly Once
+@st.cache_resource
+def initialize_database():
+    seed_default_data()
+    return True
+
+initialize_database()
 
 # --- Sidebar UI Matching Mockup ---
 with st.sidebar:
@@ -99,14 +115,17 @@ with st.sidebar:
     )
     st.session_state["current_page"] = selected_nav
 
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
 
-    # Quick Probe Action
-    if st.button("⚡ Probe Active Targets", use_container_width=True, help="Executes live network ping probes to targets immediately"):
-        with st.spinner("Probing targets via ICMP/TCP..."):
+    # Quick Probe & Refresh Actions
+    if st.button("⚡ Probe Active Targets", use_container_width=True, help="Executes live parallel network probes to targets"):
+        with st.spinner("Probing targets via ICMP/TCP in parallel..."):
             probe_all_targets()
-            st.success("Telemetry updated!")
-            st.rerun()
+            st.session_state["last_probe_time"] = datetime.datetime.now().strftime("%I:%M:%S %p")
+            st.toast("⚡ Active probes completed successfully!", icon="✅")
+
+    if st.button("🔄 Refresh Data", use_container_width=True, help="Reload fresh metrics from SQLite"):
+        st.rerun()
 
     st.markdown("---")
 
@@ -130,8 +149,10 @@ with st.sidebar:
 
 
 # --- Real-Time Dashboard View Fragment ---
-@st.fragment(run_every="10s")
+@st.fragment(run_every="30s")
 def render_dashboard_content():
+    is_dark = st.session_state.get("dark_mode", False)
+
     # Fetch latest data from SQLite
     targets = get_target_latest_status()
     recent_measurements = get_recent_measurements(limit=5)
@@ -165,8 +186,37 @@ def render_dashboard_content():
             label_visibility="collapsed"
         )
         st.session_state["search_query"] = search_query
+
     with actions_col:
-        st.html(render_top_header_actions())
+        act_c1, act_c2, act_c3 = st.columns([0.8, 0.8, 3.2], gap="small")
+        with act_c1:
+            theme_icon = "☀️" if is_dark else "🌙"
+            if st.button(theme_icon, key="top_theme_btn", help="Toggle Light / Dark NOC Mode"):
+                st.session_state["dark_mode"] = not is_dark
+                st.rerun()
+        with act_c2:
+            with st.popover("🔔", help="Active Alerts & Quick Notifications"):
+                st.markdown("#### 🔔 System Notifications")
+                if anomalies:
+                    for a in anomalies:
+                        st.markdown(f"- **{a.get('name', 'Target')}**: {a.get('reason', 'Network issue')}")
+                else:
+                    st.success("All systems optimal. No active alerts.")
+                if st.button("View Anomaly Timeline →", key="pop_goto_alerts"):
+                    st.session_state["current_page"] = "Alerts"
+                    st.rerun()
+        with act_c3:
+            st.html("""
+            <div style="display:flex; justify-content:flex-end;">
+                <div class="user-profile-capsule">
+                    <div class="user-avatar-circle">DM</div>
+                    <span class="user-name-text">Dhanumithra</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+            </div>
+            """)
 
     # Greeting Banner
     st.html(render_hero_greeting())
@@ -217,7 +267,7 @@ def render_dashboard_content():
                 st.session_state["map_view"] = map_tabs
 
             if map_tabs == "World View" or map_tabs == "Region":
-                map_fig = create_topology_map_figure(filtered_targets)
+                map_fig = create_topology_map_figure(filtered_targets, view_mode=map_tabs, is_dark=is_dark)
                 st.plotly_chart(map_fig, use_container_width=True, config={"displayModeBar": False, "staticPlot": False})
             else:
                 list_df = pd.DataFrame([{
@@ -265,7 +315,7 @@ def render_dashboard_content():
                     )
                     st.session_state["trend_timeframe"] = tf_tabs
 
-                trend_fig = create_performance_trends_figure()
+                trend_fig = create_performance_trends_figure(timeframe=tf_tabs, is_dark=is_dark)
                 st.plotly_chart(trend_fig, use_container_width=True, config={"displayModeBar": False})
 
         # Bottom Card 2: Packet Loss & Availability Donut
@@ -283,7 +333,7 @@ def render_dashboard_content():
                 </div>
                 """)
 
-                donut_fig = create_availability_donut_figure(avail_pct=avail_pct, successful=1217, failed=29)
+                donut_fig = create_availability_donut_figure(avail_pct=avail_pct, successful=1217, failed=29, is_dark=is_dark)
                 st.plotly_chart(donut_fig, use_container_width=True, config={"displayModeBar": False})
 
                 st.html("""
@@ -317,68 +367,97 @@ def render_dashboard_content():
     with col_side:
         # Card 1: Live Target Status
         with st.container(border=True):
-            st.html("""
-            <div class="card-title-bar">
-                <div class="card-title-left">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
-                        <rect x="2" y="2" width="20" height="20" rx="4"></rect>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    <span class="card-title-text">Live Target Status</span>
+            tgt_h_l, tgt_h_r = st.columns([2.3, 1.2])
+            with tgt_h_l:
+                st.html("""
+                <div class="card-title-bar" style="margin-bottom:0;">
+                    <div class="card-title-left">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                            <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <span class="card-title-text">Live Target Status</span>
+                    </div>
                 </div>
-                <span class="view-all-link">View All →</span>
-            </div>
-            """)
+                """)
+            with tgt_h_r:
+                if st.button("View All →", key="view_all_targets", help="Open Targets Page"):
+                    st.session_state["current_page"] = "Targets"
+                    st.rerun()
+
             st.html(render_live_target_status_list(targets))
 
         # Card 2: Active Alerts
         with st.container(border=True):
-            st.html("""
-            <div class="card-title-bar">
-                <div class="card-title-left">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                    <span class="card-title-text">Active Alerts</span>
+            alr_h_l, alr_h_r = st.columns([2.3, 1.2])
+            with alr_h_l:
+                st.html("""
+                <div class="card-title-bar" style="margin-bottom:0;">
+                    <div class="card-title-left">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <span class="card-title-text">Active Alerts</span>
+                    </div>
                 </div>
-                <span class="view-all-link">View All →</span>
-            </div>
-            """)
+                """)
+            with alr_h_r:
+                if st.button("View All →", key="view_all_alerts", help="Open Alerts Page"):
+                    st.session_state["current_page"] = "Alerts"
+                    st.rerun()
+
             st.html(render_active_alerts_list(anomalies))
 
         # Card 3: Recent Activity
         with st.container(border=True):
-            st.html("""
-            <div class="card-title-bar">
-                <div class="card-title-left">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <span class="card-title-text">Recent Activity</span>
+            act_h_l, act_h_r = st.columns([2.3, 1.2])
+            with act_h_l:
+                st.html("""
+                <div class="card-title-bar" style="margin-bottom:0;">
+                    <div class="card-title-left">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0e2428" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                        <span class="card-title-text">Recent Activity</span>
+                    </div>
                 </div>
-                <span class="view-all-link">View All →</span>
-            </div>
-            """)
+                """)
+            with act_h_r:
+                if st.button("View All →", key="view_all_activity", help="Open Measurements Page"):
+                    st.session_state["current_page"] = "Measurements"
+                    st.rerun()
+
             st.html(render_recent_activity_rows(recent_measurements))
 
 
 # --- Supplementary Views (When sidebar menu is clicked) ---
 
 def render_targets_view():
-    st.html("<h2 style='color:#0f172a;'>🎯 Network Targets Management</h2>")
+    st.html("<h2 style='color:var(--text-primary);'>🎯 Network Targets Management</h2>")
     st.caption("Inspect and configure active network monitoring targets stored in SQLite.")
     
+    t_act_col1, t_act_col2 = st.columns([1, 3])
+    with t_act_col1:
+        if st.button("⚡ Probe All Targets Now", use_container_width=True):
+            with st.spinner("Probing targets in parallel..."):
+                res = probe_all_targets()
+                st.toast(f"Probed {len(res)} targets successfully!", icon="✅")
+                st.rerun()
+    with t_act_col2:
+        t_search = st.text_input("Filter targets table", placeholder="Type name or host to filter...", label_visibility="collapsed")
+
     conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM targets", conn)
+    query = "SELECT * FROM targets"
+    if t_search.strip():
+        query += f" WHERE name LIKE '%{t_search.strip()}%' OR host LIKE '%{t_search.strip()}%'"
+    df = pd.read_sql_query(query, conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
 
-    with st.expander("Add New Monitored Target"):
+    with st.expander("➕ Add New Monitored Target", expanded=False):
         with st.form("new_target_form"):
-            t_id = st.text_input("Target ID (e.g. quad9)")
             t_name = st.text_input("Name (e.g. Quad9 DNS)")
             t_host = st.text_input("Host IP/Domain (e.g. 9.9.9.9)")
             col1, col2 = st.columns(2)
@@ -388,66 +467,189 @@ def render_targets_view():
                 t_lon = st.number_input("Longitude", value=-74.0060)
             
             submitted = st.form_submit_button("Add Target to Network Monitor")
-            if submitted and t_name and t_host:
-                insert_target({
-                    "name": t_name,
-                    "host": t_host,
-                    "resolved_ip": t_host,
-                    "lat": t_lat,
-                    "lon": t_lon,
-                    "enabled": True,
-                    "interval": 5,
-                    "timeout": 2
-                })
-                st.success(f"Added {t_name} successfully!")
-                st.rerun()
+            if submitted:
+                if t_name and t_host:
+                    insert_target({
+                        "name": t_name,
+                        "host": t_host,
+                        "resolved_ip": t_host,
+                        "lat": t_lat,
+                        "lon": t_lon,
+                        "enabled": True,
+                        "interval": 5,
+                        "timeout": 2
+                    })
+                    st.toast(f"Added {t_name} successfully!", icon="✅")
+                    st.success(f"Target '{t_name}' ({t_host}) registered in monitor database.")
+                    st.rerun()
+                else:
+                    st.error("Please provide both target Name and Host IP.")
 
 def render_measurements_view():
-    st.html("<h2 style='color:#0f172a;'>📊 Telemetry Measurements Log</h2>")
+    st.html("<h2 style='color:var(--text-primary);'>📊 Telemetry Measurements Log</h2>")
     st.caption("Raw ICMP / TCP packet-level telemetry records stored in SQLite database.")
     
+    m_col1, m_col2 = st.columns([1.5, 2.5])
+    with m_col1:
+        proto_filter = st.radio("Protocol Filter", ["All", "ICMP", "TCP"], horizontal=True)
+
     conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM measurements ORDER BY id DESC LIMIT 200", conn)
+    if proto_filter == "All":
+        df = pd.read_sql_query("SELECT * FROM measurements ORDER BY id DESC LIMIT 200", conn._conn)
+    else:
+        df = pd.read_sql_query(f"SELECT * FROM measurements WHERE protocol = '{proto_filter}' ORDER BY id DESC LIMIT 200", conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
 
+    csv_data = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Export Measurements to CSV",
+        data=csv_data,
+        file_name="telemetry_measurements.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
 def render_analytics_view():
-    st.html("<h2 style='color:#0f172a;'>📈 Performance Analytics & Aggregated Windows</h2>")
+    st.html("<h2 style='color:var(--text-primary);'>📈 Performance Analytics & Aggregated Windows</h2>")
     st.caption("Rolling statistical windows: Jitter, Availability, P95, and P99 percentiles.")
     
+    if st.button("⚡ Recalculate Rolling Statistical Window", use_container_width=True):
+        with st.spinner("Computing statistics across telemetry measurements..."):
+            with get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT target_id, name, host FROM targets")
+                targets = cursor.fetchall()
+                for t in targets:
+                    tid = t["target_id"]
+                    cursor.execute("SELECT rtt_ms, success FROM measurements WHERE target_id = ? ORDER BY id DESC LIMIT 30", (tid,))
+                    recs = cursor.fetchall()
+                    if recs:
+                        total = len(recs)
+                        succ = sum(1 for r in recs if r["success"] == 1)
+                        rtts = [r["rtt_ms"] for r in recs if r["success"] == 1 and r["rtt_ms"] is not None]
+                        st_calc = calculate_rolling_statistics(rtts, total, succ)
+                        cursor.execute("""
+                        INSERT INTO window_metrics (timestamp, target_id, window_size, mean_rtt_ms, median_rtt_ms, p95_rtt_ms, p99_rtt_ms, jitter_ms, packet_loss_pct, availability_pct)
+                        VALUES (datetime('now'), ?, 30, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            tid,
+                            st_calc["mean_rtt"],
+                            st_calc["median_rtt"],
+                            st_calc["p95_rtt"],
+                            st_calc["p99_rtt"],
+                            st_calc["jitter"],
+                            st_calc["packet_loss_pct"],
+                            st_calc["availability_pct"]
+                        ))
+                conn.commit()
+            st.toast("Rolling window statistics updated!", icon="✅")
+            st.rerun()
+
     conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM window_metrics ORDER BY id DESC LIMIT 100", conn)
+    df = pd.read_sql_query("SELECT * FROM window_metrics ORDER BY id DESC LIMIT 100", conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
 
 def render_alerts_view():
-    st.html("<h2 style='color:#0f172a;'>🔔 Anomaly Detection Timeline</h2>")
+    st.html("<h2 style='color:var(--text-primary);'>🔔 Anomaly Detection Timeline</h2>")
     st.caption("Autonomous threshold evaluations and historical network degradation flags.")
     
+    al_col1, al_col2 = st.columns([1, 1])
+    with al_col1:
+        if st.button("🔍 Run Anomaly Audit Scan", use_container_width=True):
+            with st.spinner("Auditing recent measurements against thresholds..."):
+                detector = AnomalyDetector(
+                    rtt_threshold=st.session_state.get("thresh_rtt", 90.0),
+                    loss_threshold=st.session_state.get("thresh_loss", 5.0),
+                    jitter_threshold=st.session_state.get("thresh_jitter", 20.0)
+                )
+                with get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT target_id FROM targets")
+                    t_ids = [r[0] for r in cursor.fetchall()]
+                    found = 0
+                    for tid in t_ids:
+                        cursor.execute("SELECT rtt_ms, success FROM measurements WHERE target_id = ? ORDER BY id DESC LIMIT 20", (tid,))
+                        rows = cursor.fetchall()
+                        if rows:
+                            tot = len(rows)
+                            succ = sum(1 for r in rows if r["success"] == 1)
+                            rtts = [r["rtt_ms"] for r in rows if r["success"] == 1 and r["rtt_ms"] is not None]
+                            st_calc = calculate_rolling_statistics(rtts, tot, succ)
+                            anom = detector.detect(st_calc)
+                            if anom:
+                                cursor.execute("""
+                                INSERT INTO anomalies (target_id, metric, observed_value, baseline, threshold, reason)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                                """, (str(tid), anom["metric"], anom["observed_value"], anom["baseline"], anom["threshold"], anom["reason"]))
+                                found += 1
+                    conn.commit()
+                st.toast(f"Anomaly audit complete: {found} flagged.", icon="🔔")
+                st.rerun()
+
+    with al_col2:
+        if st.button("🧹 Clear Anomalies History", use_container_width=True):
+            with get_connection() as conn:
+                conn.execute("DELETE FROM anomalies")
+                conn.commit()
+            st.toast("Anomalies cleared successfully!", icon="✅")
+            st.rerun()
+
     conn = get_connection()
-    df = pd.read_sql_query("SELECT * FROM anomalies ORDER BY id DESC LIMIT 50", conn)
+    df = pd.read_sql_query("SELECT * FROM anomalies ORDER BY id DESC LIMIT 50", conn._conn)
     conn.close()
     
     st.dataframe(df, use_container_width=True)
 
 def render_reports_view():
-    st.html("<h2 style='color:#0f172a;'>📄 Network Operations Center (NOC) Executive Report</h2>")
-    st.markdown("""
-    ### NetTelemetry Computer Networks Implementation
-    - **Active Probing vs Passive Sniffing:** Active ICMP and controlled TCP connection tests measure end-to-end user experience and immediate packet drops rather than passively waiting for third-party traffic.
-    - **Statistical Jitter:** RFC 3550 style delay variation tracking consecutive RTT delta values:
-      $$\\text{Jitter} = \\frac{1}{N-1} \\sum_{i=1}^{N-1} |\\text{RTT}_i - \\text{RTT}_{i-1}|$$
-    - **Latency Percentiles:** P95 and P99 latency percentiles identify path jitter and router bufferbloat that mean RTT averages obscure.
-    """)
+    st.html("<h2 style='color:var(--text-primary);'>📄 Network Operations Center (NOC) Executive Report</h2>")
+    
+    report_text = """### NetTelemetry Computer Networks Implementation
+- **Active Probing vs Passive Sniffing:** Active ICMP and controlled TCP connection tests measure end-to-end user experience and immediate packet drops rather than passively waiting for third-party traffic.
+- **Statistical Jitter:** RFC 3550 style delay variation tracking consecutive RTT delta values:
+  $$\\text{Jitter} = \\frac{1}{N-1} \\sum_{i=1}^{N-1} |\\text{RTT}_i - \\text{RTT}_{i-1}|$$
+- **Latency Percentiles:** P95 and P99 latency percentiles identify path jitter and router bufferbloat that mean RTT averages obscure.
+- **Database Architecture:** SQLite in WAL mode with relational targets, telemetry measurements, window metrics, and anomaly events.
+"""
+    st.markdown(report_text)
+
+    r_col1, r_col2 = st.columns(2)
+    with r_col1:
+        st.download_button(
+            "📥 Download Executive Report (Markdown)",
+            data=report_text,
+            file_name="NetTelemetry_Report.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+    with r_col2:
+        with get_connection() as conn:
+            m_df = pd.read_sql_query("SELECT * FROM measurements ORDER BY id DESC LIMIT 500", conn._conn)
+        st.download_button(
+            "📥 Download Full Telemetry Dataset (CSV)",
+            data=m_df.to_csv(index=False).encode('utf-8'),
+            file_name="telemetry_dataset.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
 def render_settings_view():
-    st.html("<h2 style='color:#0f172a;'>⚙️ Telemetry Settings & Thresholds</h2>")
-    st.number_input("RTT Anomaly Spike Threshold (ms)", value=90.0)
-    st.number_input("Packet Loss Warning Threshold (%)", value=5.0)
-    st.number_input("Jitter Threshold (ms)", value=20.0)
-    st.button("Save Settings")
+    st.html("<h2 style='color:var(--text-primary);'>⚙️ Telemetry Settings & Thresholds</h2>")
+    st.caption("Customize autonomous anomaly detection thresholds and operational parameters.")
+    
+    rtt_val = st.number_input("RTT Anomaly Spike Threshold (ms)", value=float(st.session_state["thresh_rtt"]))
+    loss_val = st.number_input("Packet Loss Warning Threshold (%)", value=float(st.session_state["thresh_loss"]))
+    jitter_val = st.number_input("Jitter Threshold (ms)", value=float(st.session_state["thresh_jitter"]))
+    
+    if st.button("💾 Save Settings", use_container_width=True):
+        st.session_state["thresh_rtt"] = rtt_val
+        st.session_state["thresh_loss"] = loss_val
+        st.session_state["thresh_jitter"] = jitter_val
+        st.toast("Settings saved successfully!", icon="✅")
+        st.success("✅ Telemetry thresholds updated and persisted in active session state.")
 
 
 # --- Main Router ---
