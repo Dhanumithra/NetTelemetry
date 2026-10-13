@@ -49,3 +49,14 @@ CREATE TABLE IF NOT EXISTS anomalies (
     threshold REAL,
     reason TEXT
 );
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
+    email TEXT,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'NOC Operator',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+

@@ -16,6 +16,9 @@ from database.db import (
     get_active_anomalies,
     get_connection,
     insert_target,
+    authenticate_user,
+    create_user,
+    get_user_by_username,
     DB_PATH
 )
 from telemetry.collector import probe_all_targets
@@ -48,7 +51,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 2. Session State for Navigation, Theme & Settings
+# 2. Initialize Database Exactly Once
+@st.cache_resource
+def initialize_database():
+    seed_default_data()
+    return True
+
+initialize_database()
+
+# 3. Session State Initialization
 if "dark_mode" not in st.session_state:
     st.session_state["dark_mode"] = False
 if "current_page" not in st.session_state:
@@ -65,21 +76,126 @@ if "thresh_loss" not in st.session_state:
     st.session_state["thresh_loss"] = 5.0
 if "thresh_jitter" not in st.session_state:
     st.session_state["thresh_jitter"] = 20.0
+if "auto_probe" not in st.session_state:
+    st.session_state["auto_probe"] = True
+
+# Default user: Dhanumithra (pre-authenticated for frictionless access)
+if "user" not in st.session_state:
+    st.session_state["user"] = get_user_by_username("dhanumithra") or {
+        "id": 1,
+        "username": "dhanumithra",
+        "full_name": "Dhanumithra",
+        "email": "dhanu@telemetry.noc",
+        "role": "NOC Lead / Administrator"
+    }
 
 is_dark = st.session_state["dark_mode"]
 
-# 3. Inject Design System & CSS
+# 4. Inject Design System & CSS
 st.markdown(get_custom_css(dark_mode=is_dark), unsafe_allow_html=True)
 
-# 4. Initialize Database Exactly Once
-@st.cache_resource
-def initialize_database():
-    seed_default_data()
-    return True
 
-initialize_database()
+# ==========================================
+# AUTHENTICATION PORTAL (When Logged Out)
+# ==========================================
+def render_auth_portal():
+    st.html("""
+    <div style="text-align:center; margin-top:2.5rem; margin-bottom:1.5rem;">
+        <div style="display:inline-flex; align-items:center; justify-content:center; width:52px; height:52px; background:rgba(16, 185, 129, 0.15); border-radius:12px; margin-bottom:0.75rem;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+        </div>
+        <h1 style="font-size:1.85rem; font-weight:800; color:var(--text-primary); margin:0;">NetTelemetry</h1>
+        <div style="font-size:0.875rem; color:var(--text-secondary); margin-top:4px;">Enterprise Network Operation Center (NOC) Portal</div>
+    </div>
+    """)
 
-# --- Sidebar UI Matching Mockup ---
+    auth_col1, auth_col2, auth_col3 = st.columns([1, 1.4, 1])
+    with auth_col2:
+        with st.container(border=True):
+            tab_login, tab_register = st.tabs(["🔐 Operator Sign In", "📝 Register New Account"])
+
+            with tab_login:
+                st.markdown("##### Sign in to access live telemetry")
+                login_user = st.text_input("Username", value="dhanumithra", key="login_username")
+                login_pwd = st.text_input("Password", type="password", value="admin", key="login_password")
+
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("🔐 Sign In", use_container_width=True, type="primary"):
+                        user = authenticate_user(login_user, login_pwd)
+                        if user:
+                            st.session_state["user"] = user
+                            st.toast(f"Welcome back, {user['full_name']}!", icon="👋")
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password.")
+                with col_btn2:
+                    if st.button("⚡ Demo (Dhanumithra)", use_container_width=True):
+                        st.session_state["user"] = get_user_by_username("dhanumithra") or {
+                            "id": 1,
+                            "username": "dhanumithra",
+                            "full_name": "Dhanumithra",
+                            "email": "dhanu@telemetry.noc",
+                            "role": "NOC Lead / Administrator"
+                        }
+                        st.toast("Signed in as Dhanumithra (NOC Lead)", icon="✅")
+                        st.rerun()
+
+                st.markdown("---")
+                if st.button("👤 Continue as Guest Observer (Read-Only)", use_container_width=True):
+                    st.session_state["user"] = {
+                        "id": 99,
+                        "username": "guest",
+                        "full_name": "Guest Observer",
+                        "email": "guest@telemetry.noc",
+                        "role": "Guest / Read-Only Observer"
+                    }
+                    st.toast("Guest session active", icon="👀")
+                    st.rerun()
+
+            with tab_register:
+                st.markdown("##### Create new NOC Operator profile")
+                reg_name = st.text_input("Full Name", placeholder="e.g. Alex Morgan")
+                reg_user = st.text_input("Username", placeholder="e.g. alex")
+                reg_email = st.text_input("Email", placeholder="e.g. alex@telemetry.noc")
+                reg_pwd = st.text_input("Password", type="password")
+                reg_role = st.selectbox("Role", ["NOC Operator", "Network Engineer", "Security Analyst", "Systems Architect"])
+
+                if st.button("Create Account & Access NOC", use_container_width=True):
+                    if reg_name and reg_user and reg_pwd:
+                        uid = create_user(reg_user, reg_name, reg_pwd, email=reg_email, role=reg_role)
+                        if uid:
+                            st.session_state["user"] = {
+                                "id": uid,
+                                "username": reg_user,
+                                "full_name": reg_name,
+                                "email": reg_email,
+                                "role": reg_role
+                            }
+                            st.toast("Account created successfully!", icon="🎉")
+                            st.rerun()
+                        else:
+                            st.error("Username already taken. Please choose another.")
+                    else:
+                        st.error("Please fill in Full Name, Username, and Password.")
+
+
+# Check if user is logged in
+if st.session_state.get("user") is None:
+    render_auth_portal()
+    st.stop()
+
+# Active logged-in user
+curr_user = st.session_state["user"]
+curr_user_name = curr_user.get("full_name", "Dhanumithra")
+curr_role = curr_user.get("role", "NOC Lead / Administrator")
+
+
+# ==========================================
+# SIDEBAR NAVIGATION & TELEMETRY CONTROLS
+# ==========================================
 with st.sidebar:
     # Brand Header
     st.html(clean_html("""
@@ -117,9 +233,13 @@ with st.sidebar:
 
     st.markdown("<div style='height: 1.25rem;'></div>", unsafe_allow_html=True)
 
+    # Real-Time Telemetry Controls
+    live_toggle = st.toggle("🔴 Real-Time Monitoring", value=st.session_state["auto_probe"], help="Toggles automated real-time background telemetry cycles")
+    st.session_state["auto_probe"] = live_toggle
+
     # Quick Probe & Refresh Actions
-    if st.button("⚡ Probe Active Targets", use_container_width=True, help="Executes live parallel network probes to targets"):
-        with st.spinner("Probing targets via ICMP/TCP in parallel..."):
+    if st.button("⚡ Probe Active Targets", use_container_width=True, help="Executes live parallel network probes to targets immediately"):
+        with st.spinner("Probing targets in parallel..."):
             probe_all_targets()
             st.session_state["last_probe_time"] = datetime.datetime.now().strftime("%I:%M:%S %p")
             st.toast("⚡ Active probes completed successfully!", icon="✅")
@@ -130,7 +250,9 @@ with st.sidebar:
     st.markdown("---")
 
     # Ambient soundwave graphic & Status pill at bottom
-    st.html(clean_html("""
+    status_text = "System Online" if live_toggle else "Monitoring Paused"
+    sub_status = "Real-time engine running" if live_toggle else "Manual refresh active"
+    st.html(clean_html(f"""
     <div class="sidebar-bottom-container">
         <svg viewBox="0 0 260 40" style="width:100%; height:32px; opacity:0.35; margin-bottom:8px;">
             <path d="M0,20 Q30,5 60,20 T120,20 T180,20 T240,20" fill="none" stroke="#10b981" stroke-width="1.5"/>
@@ -139,17 +261,21 @@ with st.sidebar:
         <div class="sidebar-status-card">
             <div class="status-dot-pulse"></div>
             <div>
-                <div class="status-text-title">System Online</div>
-                <div class="status-text-sub">All services running</div>
+                <div class="status-text-title">{status_text}</div>
+                <div class="status-text-sub">{sub_status}</div>
             </div>
         </div>
-        <div class="sidebar-footer-version">NetTelemetry v1.0.0</div>
+        <div class="sidebar-footer-version">NetTelemetry v1.0.0 • {curr_user_name}</div>
     </div>
     """))
 
 
-# --- Real-Time Dashboard View Fragment ---
-@st.fragment(run_every="30s")
+# ==========================================
+# REAL-TIME DASHBOARD VIEW FRAGMENT
+# ==========================================
+fragment_interval = "15s" if st.session_state["auto_probe"] else None
+
+@st.fragment(run_every=fragment_interval)
 def render_dashboard_content():
     is_dark = st.session_state.get("dark_mode", False)
 
@@ -176,7 +302,7 @@ def render_dashboard_content():
     avg_loss = sum(t["loss_pct"] for t in targets) / total_targets if total_targets else 2.4
     avail_pct = 100.0 - avg_loss
 
-    # Top utility row: Interactive Search bar on left, action controls on right
+    # Top utility row: Interactive Search bar on left, action controls & profile on right
     search_col, actions_col = st.columns([1.1, 1.9])
     with search_col:
         search_query = st.text_input(
@@ -206,20 +332,22 @@ def render_dashboard_content():
                     st.session_state["current_page"] = "Alerts"
                     st.rerun()
         with act_c3:
-            st.html("""
-            <div style="display:flex; justify-content:flex-end;">
-                <div class="user-profile-capsule">
-                    <div class="user-avatar-circle">DM</div>
-                    <span class="user-name-text">Dhanumithra</span>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-            </div>
-            """)
+            # Clickable Operator Profile Popover
+            with st.popover(f"👤 {curr_user_name} ▾", help="Operator Profile & Account Settings"):
+                st.markdown("### 🛡️ Operator Session")
+                st.markdown(f"**Name:** {curr_user_name}")
+                st.markdown(f"**Username:** `@{curr_user.get('username', 'dhanu')}`")
+                st.markdown(f"**Role:** `{curr_role}`")
+                st.markdown(f"**Email:** {curr_user.get('email', 'dhanu@telemetry.noc')}")
+                st.markdown("**Session:** 🟢 Active NOC Authorization")
+                st.divider()
+                if st.button("🚪 Sign Out", key="btn_logout", use_container_width=True):
+                    st.session_state["user"] = None
+                    st.toast("Signed out successfully.", icon="👋")
+                    st.rerun()
 
-    # Greeting Banner
-    st.html(render_hero_greeting())
+    # Dynamic Greeting Banner with user name
+    st.html(render_hero_greeting(user_name=curr_user_name))
 
     # 2-Column Responsive Layout
     col_main, col_side = st.columns([2.15, 1.0], gap="medium")
@@ -431,7 +559,9 @@ def render_dashboard_content():
             st.html(render_recent_activity_rows(recent_measurements))
 
 
-# --- Supplementary Views (When sidebar menu is clicked) ---
+# ==========================================
+# SUPPLEMENTARY VIEWS (When Menu Items Clicked)
+# ==========================================
 
 def render_targets_view():
     st.html("<h2 style='color:var(--text-primary);'>🎯 Network Targets Management</h2>")
@@ -607,7 +737,8 @@ def render_alerts_view():
 def render_reports_view():
     st.html("<h2 style='color:var(--text-primary);'>📄 Network Operations Center (NOC) Executive Report</h2>")
     
-    report_text = """### NetTelemetry Computer Networks Implementation
+    report_text = f"""### NetTelemetry Computer Networks Implementation
+- **Operator Authorization:** Authenticated as {curr_user_name} ({curr_role}).
 - **Active Probing vs Passive Sniffing:** Active ICMP and controlled TCP connection tests measure end-to-end user experience and immediate packet drops rather than passively waiting for third-party traffic.
 - **Statistical Jitter:** RFC 3550 style delay variation tracking consecutive RTT delta values:
   $$\\text{Jitter} = \\frac{1}{N-1} \\sum_{i=1}^{N-1} |\\text{RTT}_i - \\text{RTT}_{i-1}|$$

@@ -344,7 +344,7 @@ div[data-testid="stTextInput"] input::placeholder {
     padding: 0.25rem 0.75rem 0.25rem 0.35rem;
     border-radius: 20px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-    cursor: pointer;
+    cursor: default;
 }
 
 .user-avatar-circle {
@@ -504,7 +504,7 @@ div[data-testid="stTextInput"] input::placeholder {
 
 .kpi-dots {
     color: #cbd5e1;
-    cursor: pointer;
+    cursor: default;
     font-size: 1rem;
     line-height: 1;
 }
@@ -1069,15 +1069,17 @@ div[data-testid="stRadio"] > div[role="radiogroup"] > label:has(input:checked) p
     }
 }
 
-/* Circular Top Action Header Buttons */
+/* Circular Top Action Header Buttons (Theme & Bell icon) */
 button[key="top_theme_btn"],
 div[data-testid="column"]:has(button[key="top_theme_btn"]) button,
-div[data-testid="stPopover"] > button {
+div[data-testid="stPopover"]:has(button:has(p:contains("🔔"))) > button,
+div[data-testid="stPopover"]:has(button:contains("🔔")) > button {
     width: 38px !important;
     height: 38px !important;
     min-height: 38px !important;
     max-height: 38px !important;
     min-width: 38px !important;
+    max-width: 38px !important;
     border-radius: 50% !important;
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
@@ -1093,10 +1095,36 @@ div[data-testid="stPopover"] > button {
 
 button[key="top_theme_btn"]:hover,
 div[data-testid="column"]:has(button[key="top_theme_btn"]) button:hover,
-div[data-testid="stPopover"] > button:hover {
+div[data-testid="stPopover"]:has(button:has(p:contains("🔔"))) > button:hover,
+div[data-testid="stPopover"]:has(button:contains("🔔")) > button:hover {
     border-color: #cbd5e1 !important;
     transform: translateY(-1px) !important;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* User Profile Capsule Popover Button */
+div[data-testid="stPopover"]:has(button:has(p:contains("▾"))) > button,
+div[data-testid="stPopover"]:has(button:contains("▾")) > button {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    padding: 0.25rem 0.85rem !important;
+    font-size: 0.825rem !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    cursor: pointer !important;
+}
+
+div[data-testid="stPopover"]:has(button:has(p:contains("▾"))) > button:hover,
+div[data-testid="stPopover"]:has(button:contains("▾")) > button:hover {
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Card Header 'View All →' Links */

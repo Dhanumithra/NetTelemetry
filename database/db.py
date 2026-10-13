@@ -237,6 +237,15 @@ def seed_default_data(db_path=DEFAULT_DB_PATH):
     for t in default_targets:
         insert_target(t, db_path)
 
+    # Seed default NOC users if empty
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            create_user("dhanumithra", "Dhanumithra", "admin", "dhanu@telemetry.noc", "NOC Lead / Administrator", db_path)
+            create_user("admin", "Administrator", "admin", "admin@telemetry.noc", "NOC Administrator", db_path)
+            create_user("operator", "Network Operator", "noc", "ops@telemetry.noc", "NOC Operator", db_path)
+
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM measurements")
@@ -413,3 +422,54 @@ def get_active_anomalies(db_path=DEFAULT_DB_PATH, limit: int = 10) -> List[Dict[
         ''', (limit,))
         rows = [dict(row) for row in cursor.fetchall()]
         return rows
+
+
+# --- Authentication & User Management ---
+import hashlib
+
+def hash_password(password: str) -> str:
+    """Computes SHA-256 hash of password string."""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def create_user(username: str, full_name: str, password: str, email: str = "", role: str = "NOC Operator", db_path=DEFAULT_DB_PATH) -> Optional[int]:
+    """Registers a new user in the users table."""
+    init_db(db_path)
+    pwd_hash = hash_password(password)
+    try:
+        with get_connection(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO users (username, full_name, email, password_hash, role)
+            VALUES (?, ?, ?, ?, ?)
+            """, (username.strip().lower(), full_name.strip(), email.strip(), pwd_hash, role))
+            conn.commit()
+            return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        return None
+    except Exception:
+        return None
+
+def authenticate_user(username: str, password: str, db_path=DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Validates user credentials against the users table."""
+    init_db(db_path)
+    u_name = username.strip().lower()
+    pwd_hash = hash_password(password)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, full_name, email, role, created_at FROM users WHERE username = ? AND password_hash = ?", (u_name, pwd_hash))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+def get_user_by_username(username: str, db_path=DEFAULT_DB_PATH) -> Optional[Dict[str, Any]]:
+    """Fetches user details by username."""
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, full_name, email, role, created_at FROM users WHERE username = ?", (username.strip().lower(),))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+

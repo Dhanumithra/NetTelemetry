@@ -102,16 +102,18 @@ def render_top_header_actions() -> str:
     """
     return clean_html(html)
 
-def render_hero_greeting() -> str:
+def render_hero_greeting(user_name: str = "Dhanumithra") -> str:
     now = datetime.datetime.now()
     formatted_date = now.strftime("%a, %b %d, %Y")
     formatted_time = now.strftime("%I:%M %p")
+    hour = now.hour
+    greeting_prefix = "Good Morning" if hour < 12 else ("Good Afternoon" if hour < 17 else "Good Evening")
 
     html = f"""
     <div class="hero-greeting-container" style="margin-top: 0.5rem; margin-bottom: 1.25rem;">
         <div>
             <div class="hero-subtitle-tag">NETWORK TELEMETRY</div>
-            <div class="hero-main-title">Good Morning, Dhanumithra!</div>
+            <div class="hero-main-title">{greeting_prefix}, {user_name}!</div>
             <div class="hero-subtext">Here's what's happening with your network targets today.</div>
         </div>
         <div class="hero-meta-badge">
