@@ -1,10 +1,22 @@
 from typing import Dict, Any, Optional
+from network.settings_manager import load_thresholds, DEFAULT_THRESHOLDS
 
 class AnomalyDetector:
-    def __init__(self, rtt_threshold: float = 100.0, loss_threshold: float = 5.0, jitter_threshold: float = 20.0):
-        self.rtt_threshold = rtt_threshold
-        self.loss_threshold = loss_threshold
-        self.jitter_threshold = jitter_threshold
+    def __init__(
+        self,
+        rtt_threshold: Optional[float] = None,
+        loss_threshold: Optional[float] = None,
+        jitter_threshold: Optional[float] = None,
+        config_path: Optional[str] = None
+    ):
+        # Read saved thresholds from configuration storage if not explicitly provided
+        saved = load_thresholds(config_path=config_path) if (
+            config_path or rtt_threshold is None or loss_threshold is None or jitter_threshold is None
+        ) else DEFAULT_THRESHOLDS
+
+        self.rtt_threshold = float(rtt_threshold) if rtt_threshold is not None else float(saved.get("rtt_ms", 90.0))
+        self.loss_threshold = float(loss_threshold) if loss_threshold is not None else float(saved.get("loss_pct", 5.0))
+        self.jitter_threshold = float(jitter_threshold) if jitter_threshold is not None else float(saved.get("jitter_ms", 20.0))
 
     def detect(self, current_metrics: Dict[str, Any], baseline_metrics: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """

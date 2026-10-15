@@ -59,8 +59,60 @@ class DBConnectionWrapper:
 def get_connection(db_path=DEFAULT_DB_PATH):
     return DBConnectionWrapper(db_path)
 
+def _apply_migrations(conn):
+    """
+    Applies schema migrations to ensure existing tables have all required columns.
+    Safe to run repeatedly without modifying existing data.
+    """
+    cursor = conn.cursor()
+    # Check if targets table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='targets';")
+    if cursor.fetchone():
+        cursor.execute("PRAGMA table_info(targets);")
+        rows = cursor.fetchall()
+        existing_cols = set()
+        for row in rows:
+            if isinstance(row, sqlite3.Row):
+                existing_cols.add(row["name"])
+            elif hasattr(row, "keys"):
+                existing_cols.add(row["name"])
+            else:
+                existing_cols.add(row[1])
+
+        target_columns = [
+            ("resolved_ip", "TEXT"),
+            ("lat", "REAL DEFAULT 0.0"),
+            ("lon", "REAL DEFAULT 0.0"),
+            ("enabled", "INTEGER NOT NULL DEFAULT 1"),
+            ("interval", "INTEGER NOT NULL DEFAULT 5"),
+            ("timeout", "INTEGER NOT NULL DEFAULT 2"),
+        ]
+
+        for col_name, col_def in target_columns:
+            if col_name not in existing_cols:
+                cursor.execute(f"ALTER TABLE targets ADD COLUMN {col_name} {col_def};")
+                existing_cols.add(col_name)
+
+        if "lat" in existing_cols:
+            cursor.execute("UPDATE targets SET lat = 0.0 WHERE lat IS NULL;")
+        if "lon" in existing_cols:
+            cursor.execute("UPDATE targets SET lon = 0.0 WHERE lon IS NULL;")
+
+    conn.commit()
+
+def migrate_db(db_path=DEFAULT_DB_PATH):
+    """
+    Public migration function to update an existing SQLite database schema.
+    Can accept a database file path or an active connection/wrapper.
+    """
+    if isinstance(db_path, (str, bytes, os.PathLike)):
+        with get_connection(db_path) as conn:
+            _apply_migrations(conn)
+    else:
+        _apply_migrations(db_path)
+
 def init_db(db_path=DEFAULT_DB_PATH, schema_path=DEFAULT_SCHEMA_PATH):
-    """Initialize the SQLite database using schema.sql."""
+    """Initialize the SQLite database using schema.sql and apply any migrations."""
     if not os.path.exists(schema_path):
         raise FileNotFoundError(f"Schema file not found at: {schema_path}")
 
@@ -69,6 +121,7 @@ def init_db(db_path=DEFAULT_DB_PATH, schema_path=DEFAULT_SCHEMA_PATH):
 
     with get_connection(db_path) as conn:
         conn.executescript(schema_sql)
+        _apply_migrations(conn)
         conn.commit()
 
 def insert_target(target, db_path=DEFAULT_DB_PATH):
@@ -105,13 +158,19 @@ def insert_target(target, db_path=DEFAULT_DB_PATH):
             cursor.execute(sql, (name, host, resolved_ip, lat, lon, enabled, interval, timeout))
             row = cursor.fetchone()
             target_id = row["target_id"] if row else None
-        except sqlite3.OperationalError:
-            cursor.execute("""
-                INSERT OR REPLACE INTO targets (name, host, resolved_ip, lat, lon, enabled, interval, timeout)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-            """, (name, host, resolved_ip, lat, lon, enabled, interval, timeout))
-            cursor.execute("SELECT target_id FROM targets WHERE host = ?", (host,))
-            target_id = cursor.fetchone()["target_id"]
+        except sqlite3.OperationalError as e:
+            if "no column named" in str(e).lower():
+                _apply_migrations(conn)
+                cursor.execute(sql, (name, host, resolved_ip, lat, lon, enabled, interval, timeout))
+                row = cursor.fetchone()
+                target_id = row["target_id"] if row else None
+            else:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO targets (name, host, resolved_ip, lat, lon, enabled, interval, timeout)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                """, (name, host, resolved_ip, lat, lon, enabled, interval, timeout))
+                cursor.execute("SELECT target_id FROM targets WHERE host = ?", (host,))
+                target_id = cursor.fetchone()["target_id"]
         conn.commit()
         return target_id
 
@@ -133,6 +192,57 @@ def get_target_by_id(target_id, db_path=DEFAULT_DB_PATH):
         row = cursor.fetchone()
         return dict(row) if row else None
 
+def target_exists(host: str, db_path=DEFAULT_DB_PATH) -> bool:
+    """Check if a target with the given host or resolved_ip already exists."""
+    if not host:
+        return False
+    from network.target_manager import normalize_target_host
+    clean_host = normalize_target_host(host)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT target_id, host, resolved_ip FROM targets;")
+        rows = cursor.fetchall()
+        for r in rows:
+            h = normalize_target_host(r["host"] or "")
+            rip = normalize_target_host(r["resolved_ip"] or "")
+            if h == clean_host or (rip and rip == clean_host):
+                return True
+    return False
+
+def add_target_validated(name: str, host: str, interval: int = 5, timeout: int = 2, lat: float = 0.0, lon: float = 0.0, db_path=DEFAULT_DB_PATH) -> Dict[str, Any]:
+    """
+    Validates host input, checks for duplicates, resolves IP, and inserts target into SQLite.
+    Returns a dict with success status and target details or error message.
+    """
+    from network.target_manager import validate_hostname_or_ip, normalize_target_host, resolve_target
+
+    is_valid, msg = validate_hostname_or_ip(host)
+    if not is_valid:
+        return {"success": False, "status": "error", "error": msg, "message": msg}
+
+    clean_host = normalize_target_host(host)
+    if target_exists(clean_host, db_path=db_path):
+        dup_msg = f"Target '{clean_host}' is already being monitored."
+        return {"success": False, "status": "exists", "error": dup_msg, "message": dup_msg, "is_duplicate": True}
+
+    resolved_ip = resolve_target(clean_host)
+    target_name = name.strip() if name and name.strip() else clean_host
+
+    target_data = {
+        "name": target_name,
+        "host": clean_host,
+        "resolved_ip": resolved_ip,
+        "lat": float(lat) if lat else 0.0,
+        "lon": float(lon) if lon else 0.0,
+        "enabled": True,
+        "interval": max(1, int(interval)),
+        "timeout": max(1, int(timeout))
+    }
+
+    target_id = insert_target(target_data, db_path=db_path)
+    target_data["target_id"] = target_id
+    return {"success": True, "status": "success", "target": target_data, "message": f"Target '{target_name}' added successfully."}
+
 def insert_measurement(measurement, db_path=DEFAULT_DB_PATH):
     """
     Insert a telemetry measurement using parameterized SQL.
@@ -144,7 +254,12 @@ def insert_measurement(measurement, db_path=DEFAULT_DB_PATH):
         if target_row:
             target_id = target_row["target_id"]
         else:
-            target_id = insert_target({"name": measurement["target"], "host": measurement["target"]}, db_path)
+            from network.target_manager import validate_hostname_or_ip, normalize_target_host
+            clean_host = normalize_target_host(measurement["target"])
+            is_valid, err_msg = validate_hostname_or_ip(clean_host)
+            if not is_valid:
+                raise ValueError(f"Cannot auto-register target for measurement: {err_msg}")
+            target_id = insert_target({"name": clean_host, "host": clean_host}, db_path)
 
     if target_id is None:
         raise ValueError("Measurement must specify target_id or a valid target host.")
@@ -360,12 +475,12 @@ def get_target_latest_status(db_path=DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
                 failed_probes = sum(1 for r in recent if r["success"] == 0)
                 loss_pct = round((failed_probes / total_probes) * 100, 1)
                 successful_rtts = [r["rtt_ms"] for r in recent if r["success"] == 1 and r["rtt_ms"] is not None]
-                avg_rtt = round(sum(successful_rtts) / len(successful_rtts), 1) if successful_rtts else 0.0
-                latest_rtt = latest["rtt_ms"] if latest["success"] == 1 else 0.0
+                avg_rtt = round(sum(successful_rtts) / len(successful_rtts), 1) if successful_rtts else None
+                latest_rtt = latest["rtt_ms"] if (latest["success"] == 1 and latest["rtt_ms"] is not None) else None
 
-                if loss_pct >= 80:
-                    status = "Degraded"
-                    status_color = "#f59e0b"
+                if loss_pct == 100 and total_probes >= 3:
+                    status = "Offline"
+                    status_color = "#ef4444"
                 elif loss_pct > 10:
                     status = "Degraded"
                     status_color = "#f59e0b"
@@ -373,11 +488,11 @@ def get_target_latest_status(db_path=DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
                     status = "Online"
                     status_color = "#10b981"
             else:
-                latest_rtt = 0.0
+                latest_rtt = None
                 loss_pct = 0.0
-                avg_rtt = 0.0
-                status = "Online"
-                status_color = "#10b981"
+                avg_rtt = None
+                status = "Unknown"
+                status_color = "#94a3b8"
 
             results.append({
                 "target_id": tid,
@@ -389,6 +504,8 @@ def get_target_latest_status(db_path=DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
                 "rtt_ms": latest_rtt,
                 "avg_rtt_ms": avg_rtt,
                 "loss_pct": loss_pct,
+                "availability_pct": round(100.0 - loss_pct, 1) if recent else 100.0,
+                "last_probe_time": latest["timestamp"] if recent else None,
                 "status": status,
                 "status_color": status_color
             })
@@ -417,7 +534,7 @@ def get_active_anomalies(db_path=DEFAULT_DB_PATH, limit: int = 10) -> List[Dict[
         cursor.execute('''
         SELECT a.id, a.timestamp, a.target_id, t.name, t.host, a.metric, a.observed_value, a.reason
         FROM anomalies a
-        LEFT JOIN targets t ON a.target_id = t.target_id
+        LEFT JOIN targets t ON (a.target_id = t.target_id OR a.target_id = CAST(t.target_id AS TEXT) OR a.target_id = t.name)
         ORDER BY a.id DESC LIMIT ?
         ''', (limit,))
         rows = [dict(row) for row in cursor.fetchall()]
@@ -472,4 +589,175 @@ def get_user_by_username(username: str, db_path=DEFAULT_DB_PATH) -> Optional[Dic
         if row:
             return dict(row)
         return None
+
+def clear_measurements(db_path=DEFAULT_DB_PATH) -> bool:
+    """
+    Safely delete all raw measurement records from the measurements table.
+    Preserves registered targets, window metrics, anomaly records, and users.
+    Returns True on success.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM measurements")
+        conn.commit()
+    return True
+
+def get_measurements_count(db_path=DEFAULT_DB_PATH) -> int:
+    """Returns the total number of records in the measurements table."""
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM measurements")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+def clear_anomalies(db_path=DEFAULT_DB_PATH) -> bool:
+    """
+    Safely delete all anomaly records from the anomalies table.
+    Preserves registered targets, raw measurements, window metrics, and users.
+    Returns True on success.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM anomalies")
+        conn.commit()
+    return True
+
+def get_anomalies_count(db_path=DEFAULT_DB_PATH) -> int:
+    """Returns the total number of records in the anomalies table."""
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM anomalies")
+        row = cursor.fetchone()
+        return row[0] if row else 0
+
+def get_network_performance_summary(db_path=DEFAULT_DB_PATH) -> Dict[str, Any]:
+    """
+    Computes a comprehensive live network performance summary from real SQLite records:
+    - Registered Targets: count from targets table
+    - Recorded Measurements: total count from measurements table
+    - Successful Probes: count where success = 1
+    - Failed Probes: count where success = 0 (or total - successful)
+    - Average RTT: AVG(rtt_ms) for success = 1 and rtt_ms IS NOT NULL and rtt_ms > 0
+    - Packet Loss (%): (failed / total) * 100 if total > 0 else None
+    - Availability (%): (successful / total) * 100 if total > 0 else None
+    - Recorded Anomalies: count from anomalies table
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+
+        # 1. Registered Targets
+        cursor.execute("SELECT COUNT(*) FROM targets")
+        row = cursor.fetchone()
+        num_targets = row[0] if row else 0
+
+        # 2, 3, 4. Measurements aggregation
+        cursor.execute("""
+            SELECT 
+                COUNT(*) AS total,
+                COALESCE(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END), 0) AS successful,
+                COALESCE(SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END), 0) AS failed,
+                AVG(CASE WHEN success = 1 AND rtt_ms IS NOT NULL AND rtt_ms > 0 THEN rtt_ms ELSE NULL END) AS avg_rtt
+            FROM measurements
+        """)
+        m_row = cursor.fetchone()
+        total_meas = m_row["total"] if m_row and m_row["total"] is not None else 0
+        succ_probes = m_row["successful"] if m_row and m_row["successful"] is not None else 0
+        failed_probes = m_row["failed"] if m_row and m_row["failed"] is not None else 0
+        raw_avg_rtt = m_row["avg_rtt"] if m_row and m_row["avg_rtt"] is not None else None
+
+        avg_rtt = round(float(raw_avg_rtt), 2) if raw_avg_rtt is not None else None
+
+        # 5 & 6. Packet loss and availability
+        if total_meas > 0:
+            loss_pct = round((failed_probes / total_meas) * 100.0, 2)
+            avail_pct = round((succ_probes / total_meas) * 100.0, 2)
+        else:
+            loss_pct = None
+            avail_pct = None
+
+        # 7. Recorded Anomalies
+        cursor.execute("SELECT COUNT(*) FROM anomalies")
+        a_row = cursor.fetchone()
+        num_anomalies = a_row[0] if a_row else 0
+
+    return {
+        "num_targets": num_targets,
+        "total_measurements": total_meas,
+        "successful_probes": succ_probes,
+        "failed_probes": failed_probes,
+        "avg_rtt_ms": avg_rtt,
+        "packet_loss_pct": loss_pct,
+        "availability_pct": avail_pct,
+        "num_anomalies": num_anomalies
+    }
+
+def generate_performance_interpretation(summary: Dict[str, Any]) -> str:
+    """
+    Generates a data-derived operational interpretation based on actual observed metrics.
+    Avoids false claims that targets are down solely because probes fail (as ICMP/TCP may be blocked).
+    """
+    total = summary.get("total_measurements", 0)
+    if total == 0:
+        return (
+            "No telemetry probe records are currently available in the database. "
+            "Configured endpoints are registered and ready for active monitoring cycles."
+        )
+
+    avail = summary.get("availability_pct")
+    loss = summary.get("packet_loss_pct")
+    avg_rtt = summary.get("avg_rtt_ms")
+    anomalies = summary.get("num_anomalies", 0)
+    failed = summary.get("failed_probes", 0)
+
+    observations = []
+
+    # Availability & Loss assessment
+    if avail is not None and avail >= 99.0:
+        observations.append(
+            f"Overall network reachability is high at {avail:.1f}% SLA availability with minimal packet loss ({loss:.1f}%)."
+        )
+    elif avail is not None and avail >= 90.0:
+        observations.append(
+            f"Moderate probe loss observed: {loss:.1f}% packet drop across test cycles ({avail:.1f}% availability)."
+        )
+    elif avail is not None:
+        observations.append(
+            f"Significant probe loss observed: {loss:.1f}% of probe cycles were unacknowledged ({avail:.1f}% availability)."
+        )
+
+    # Latency assessment
+    if avg_rtt is not None:
+        if avg_rtt < 50.0:
+            observations.append(f"Mean latency is excellent at {avg_rtt:.1f} ms, indicating responsive path transit.")
+        elif avg_rtt < 120.0:
+            observations.append(f"Mean latency is nominal at {avg_rtt:.1f} ms across monitored infrastructure.")
+        else:
+            observations.append(f"Elevated mean latency observed at {avg_rtt:.1f} ms, which may suggest geographic distance or path bufferbloat.")
+    else:
+        observations.append("Insufficient successful RTT samples to compute mean round-trip latency.")
+
+    # Probe failure & firewall note
+    if failed > 0:
+        observations.append(
+            f"Note: {failed} probe(s) failed or timed out. Probe failures do not necessarily indicate host downtime, "
+            "as active ICMP echo or TCP SYN requests may be intentionally filtered or rate-limited by upstream perimeter firewalls."
+        )
+
+    # Anomaly records note
+    if anomalies > 0:
+        observations.append(
+            f"A total of {anomalies} autonomous anomaly event(s) have been flagged by the statistical detector for operational review."
+        )
+    else:
+        observations.append("Zero threshold-breaching anomaly events have been logged.")
+
+    return " ".join(observations)
+
+
+
 

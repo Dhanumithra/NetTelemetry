@@ -40,5 +40,10 @@
             "interval": 5,
             "timeout": 2
         }
-    ]
+    ],
+    "thresholds": {
+        "rtt_ms": 90.0,
+        "loss_pct": 5.0,
+        "jitter_ms": 20.0
+    }
 }

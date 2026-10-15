@@ -8,13 +8,30 @@ import pandas as pd
 import datetime
 from typing import List, Dict, Any, Optional
 
-# --- High Quality SVG Brand Icons ---
+import base64
+from database.db import DEFAULT_DB_PATH
 
 SVG_NET_LOGO = """
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="36" height="36" rx="9" fill="#0D2E32" stroke="#14B8A6" stroke-width="1.5"/>
+  <line x1="5" y1="18" x2="31" y2="18" stroke="#134E4A" stroke-width="1.2" stroke-dasharray="2 2"/>
+  <polyline points="6,18 10,18 14,9 18.5,27 23,12 26.5,18 30,18" fill="none" stroke="#2DD4BF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="14" cy="9" r="2.4" fill="#14B8A6" stroke="#0B1F24" stroke-width="1.4"/>
+  <circle cx="18.5" cy="27" r="2.4" fill="#10B981" stroke="#0B1F24" stroke-width="1.4"/>
+  <circle cx="23" cy="12" r="2" fill="#34D399" stroke="#0B1F24" stroke-width="1.2"/>
 </svg>
 """
+
+def render_sidebar_brand() -> str:
+    return """
+    <div class="sidebar-brand-container">
+        <div class="brand-logo-symbol">&nbsp;</div>
+        <div class="brand-text-block">
+            <div class="brand-title">NetTelemetry</div>
+            <div class="brand-subtitle">Observe • Analyze • Stay Ahead</div>
+        </div>
+    </div>
+    """
 
 SVG_GOOGLE = """
 <svg width="18" height="18" viewBox="0 0 24 24">
@@ -206,8 +223,9 @@ def render_kpi_card_1(total_targets: int = 5, online: int = 2, offline: int = 0)
     """
     return clean_html(html)
 
-def render_kpi_card_2(avg_rtt: float = 32.0, change_pct: float = -18.0) -> str:
+def render_kpi_card_2(avg_rtt: Optional[float] = 32.0, change_pct: float = -18.0) -> str:
     spark = generate_sparkline_svg("#3b82f6", [38, 35, 36, 34, 35, 33, 31, 32])
+    val_str = f"{int(round(avg_rtt))} ms" if avg_rtt is not None else "N/A"
     html = f"""
     <div class="kpi-card">
         <div class="kpi-header">
@@ -222,7 +240,7 @@ def render_kpi_card_2(avg_rtt: float = 32.0, change_pct: float = -18.0) -> str:
             </div>
             <span class="live-badge-pill" style="font-size:0.65rem; padding:2px 6px; background:#eff6ff; color:#2563eb;">RTT</span>
         </div>
-        <div class="kpi-value">{int(round(avg_rtt))} ms</div>
+        <div class="kpi-value">{val_str}</div>
         <div class="kpi-subtext kpi-subtext-blue">
             <span>↓</span> {abs(int(change_pct))}% (vs. last hour)
         </div>
@@ -337,8 +355,18 @@ def create_topology_map_figure(targets: List[Dict[str, Any]], view_mode: str = "
             }
 
         status = t.get("status", "Online")
-        color = "#10b981" if status == "Online" else ("#f59e0b" if status == "Degraded" else "#ef4444")
+        if status == "Online":
+            color = "#10b981"
+        elif status == "Degraded":
+            color = "#f59e0b"
+        elif status == "Unknown":
+            color = "#94a3b8"
+        else:
+            color = "#ef4444"
         text_color = "#f8fafc" if is_dark else "#1e293b"
+
+        rtt_val = t.get("rtt_ms")
+        rtt_str = f"{round(rtt_val, 1)} ms" if rtt_val is not None else "N/A"
 
         # Pin marker
         fig.add_trace(go.Scattergeo(
@@ -354,7 +382,7 @@ def create_topology_map_figure(targets: List[Dict[str, Any]], view_mode: str = "
             textposition="top right",
             textfont=dict(family="Inter, sans-serif", size=10, color=text_color),
             hoverinfo="text",
-            hovertext=f"<b>{coords['name']}</b> ({coords['ip']})<br>Status: {status}<br>RTT: {t.get('rtt_ms', 0)} ms<br>Loss: {t.get('loss_pct', 0)}%",
+            hovertext=f"<b>{coords['name']}</b> ({coords['ip']})<br>Status: {status}<br>RTT: {rtt_str}<br>Loss: {t.get('loss_pct', 0)}%",
             showlegend=False
         ))
 
@@ -542,6 +570,621 @@ def create_availability_donut_figure(avail_pct: float = 97.6, successful: int = 
 
     return fig
 
+
+# ==========================================
+# ADVANCED ANALYTICS CHARTING & DATA HELPERS
+# ==========================================
+
+def fetch_analytics_measurements(
+    target_id: Optional[Any] = None,
+    time_range_hours: Optional[float] = None,
+    db_path: str = DEFAULT_DB_PATH
+) -> pd.DataFrame:
+    """
+    Fetches raw telemetry measurements joined with target names and hosts.
+    Excludes no records prematurely so packet loss can be accurately computed.
+    """
+    from database.db import get_connection
+    query = """
+    SELECT 
+        m.id,
+        m.timestamp,
+        m.target_id,
+        COALESCE(t.name, 'Target ' || m.target_id) AS target_name,
+        COALESCE(t.host, '') AS host,
+        m.protocol,
+        m.test_type,
+        m.success,
+        m.rtt_ms,
+        m.ttl,
+        m.error
+    FROM measurements m
+    LEFT JOIN targets t ON m.target_id = t.target_id
+    """
+    params = []
+    if target_id is not None and str(target_id).strip().lower() not in ("all", "none", ""):
+        query += " WHERE m.target_id = ?"
+        try:
+            params.append(int(target_id))
+        except (ValueError, TypeError):
+            params.append(str(target_id))
+    
+    query += " ORDER BY m.id ASC"
+
+    with get_connection(db_path) as conn:
+        c = getattr(conn, "_conn", conn)
+        df = pd.read_sql_query(query, c, params=params if params else None)
+
+    if not df.empty and time_range_hours and time_range_hours > 0:
+        parsed_ts = pd.to_datetime(df['timestamp'], errors='coerce')
+        cutoff = datetime.datetime.now() - datetime.timedelta(hours=time_range_hours)
+        df = df[parsed_ts >= cutoff].copy()
+
+    return df
+
+
+def fetch_analytics_window_metrics(
+    target_id: Optional[Any] = None,
+    time_range_hours: Optional[float] = None,
+    db_path: str = DEFAULT_DB_PATH
+) -> pd.DataFrame:
+    """
+    Fetches aggregated rolling statistical windows from window_metrics table.
+    Filters by target_id and time_range_hours when specified.
+    """
+    from database.db import get_connection
+    query = """
+    SELECT 
+        w.id,
+        w.target_id,
+        COALESCE(t.name, CASE WHEN w.target_id = 'global' THEN 'Global (All Targets)' ELSE 'Target ' || w.target_id END) AS target_name,
+        w.start_time,
+        w.end_time,
+        w.loss_pct,
+        w.availability_pct,
+        w.jitter_ms,
+        w.p95_ms,
+        w.p99_ms,
+        w.throughput_mbps
+    FROM window_metrics w
+    LEFT JOIN targets t ON CAST(w.target_id AS INTEGER) = t.target_id
+    """
+    params = []
+    if target_id is not None and str(target_id).strip().lower() not in ("all", "none", ""):
+        query += " WHERE (w.target_id = ? OR w.target_id = ?)"
+        params.extend([str(target_id), target_id])
+    
+    query += " ORDER BY w.id ASC"
+
+    with get_connection(db_path) as conn:
+        c = getattr(conn, "_conn", conn)
+        df = pd.read_sql_query(query, c, params=params if params else None)
+
+    if not df.empty and time_range_hours and time_range_hours > 0:
+        ts_col = df['end_time'].fillna(df['start_time'])
+        parsed_ts = pd.to_datetime(ts_col, errors='coerce')
+        cutoff = datetime.datetime.now() - datetime.timedelta(hours=time_range_hours)
+        df = df[parsed_ts >= cutoff].copy()
+
+    return df
+
+
+def compute_analytics_summary_kpis(
+    measurements_df: pd.DataFrame,
+    window_df: pd.DataFrame
+) -> Dict[str, Any]:
+    """
+    Computes summary KPI metrics from measurement and window records.
+    Safely handles empty datasets and failed probes without crashing or coercing missing to 0.0.
+    """
+    from telemetry.metrics import calculate_jitter, calculate_percentile
+
+    # 1. RTT Latency KPI (only successful probes with valid RTT)
+    avg_rtt = None
+    if not measurements_df.empty:
+        valid_rtts = measurements_df.loc[
+            (measurements_df["success"] == 1) & 
+            (measurements_df["rtt_ms"].notna()) & 
+            (measurements_df["rtt_ms"] > 0), 
+            "rtt_ms"
+        ]
+        if not valid_rtts.empty:
+            avg_rtt = round(float(valid_rtts.mean()), 1)
+
+    # 2. Packet Loss & Availability KPIs
+    loss_pct = 0.0
+    avail_pct = 100.0
+    if not window_df.empty and "loss_pct" in window_df.columns and window_df["loss_pct"].notna().any():
+        loss_pct = round(float(window_df["loss_pct"].dropna().iloc[-1]), 1)
+        if "availability_pct" in window_df.columns and window_df["availability_pct"].notna().any():
+            avail_pct = round(float(window_df["availability_pct"].dropna().iloc[-1]), 1)
+        else:
+            avail_pct = round(100.0 - loss_pct, 1)
+    elif not measurements_df.empty:
+        total = len(measurements_df)
+        succ = int((measurements_df["success"] == 1).sum())
+        loss_pct = round(((total - succ) / total) * 100, 1) if total > 0 else 0.0
+        avail_pct = round((succ / total) * 100, 1) if total > 0 else 100.0
+
+    # 3. Jitter KPI
+    jitter_ms = 0.0
+    if not window_df.empty and "jitter_ms" in window_df.columns and window_df["jitter_ms"].notna().any():
+        jitter_ms = round(float(window_df["jitter_ms"].dropna().iloc[-1]), 2)
+    elif not measurements_df.empty:
+        valid_rtts = measurements_df.loc[
+            (measurements_df["success"] == 1) & (measurements_df["rtt_ms"].notna()), 
+            "rtt_ms"
+        ].tolist()
+        if len(valid_rtts) >= 2:
+            jitter_ms = round(float(calculate_jitter(valid_rtts)), 2)
+
+    # 4. P95 & P99 KPIs
+    p95_ms = None
+    p99_ms = None
+    if not window_df.empty and "p95_ms" in window_df.columns and window_df["p95_ms"].notna().any():
+        p95_ms = round(float(window_df["p95_ms"].dropna().iloc[-1]), 1)
+        if "p99_ms" in window_df.columns and window_df["p99_ms"].notna().any():
+            p99_ms = round(float(window_df["p99_ms"].dropna().iloc[-1]), 1)
+    elif not measurements_df.empty:
+        valid_rtts = measurements_df.loc[
+            (measurements_df["success"] == 1) & (measurements_df["rtt_ms"].notna()), 
+            "rtt_ms"
+        ].tolist()
+        if valid_rtts:
+            p95_ms = round(float(calculate_percentile(valid_rtts, 95)), 1)
+            p99_ms = round(float(calculate_percentile(valid_rtts, 99)), 1)
+
+    return {
+        "avg_rtt": avg_rtt,
+        "loss_pct": loss_pct,
+        "availability_pct": avail_pct,
+        "jitter_ms": jitter_ms,
+        "p95_ms": p95_ms,
+        "p99_ms": p99_ms
+    }
+
+
+def create_rtt_timeline_chart(
+    df: pd.DataFrame,
+    is_dark: bool = False,
+    target_name: Optional[str] = None
+) -> go.Figure:
+    """
+    Renders an interactive line chart of RTT / Latency over time.
+    Excludes failed probes (missing RTT values) from the latency line.
+    Never displays missing values as 0.0.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty:
+        fig.add_annotation(
+            text="No telemetry measurements recorded for this selection.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=13, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=280, margin=dict(l=20, r=20, t=30, b=20)
+        )
+        return fig
+
+    # Filter out failed probes with missing RTT values
+    valid_df = df[
+        (df["success"] == 1) & 
+        (df["rtt_ms"].notna()) & 
+        (df["rtt_ms"] > 0)
+    ].copy()
+
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No successful latency probes recorded (all probes failed or timed out).",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=13, color="#ef4444")
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=280, margin=dict(l=20, r=20, t=30, b=20)
+        )
+        return fig
+
+    # Palette for multi-target lines
+    palette = ["#06b6d4", "#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ec4899", "#14b8a6", "#f97316"]
+
+    # Check if multiple targets exist in valid_df
+    distinct_targets = valid_df["target_name"].dropna().unique().tolist()
+    if len(distinct_targets) > 1 and (target_name is None or "all" in str(target_name).lower()):
+        for idx, t_name in enumerate(distinct_targets):
+            sub_df = valid_df[valid_df["target_name"] == t_name]
+            color = palette[idx % len(palette)]
+            fig.add_trace(go.Scatter(
+                x=sub_df["timestamp"],
+                y=sub_df["rtt_ms"],
+                name=t_name,
+                mode="lines+markers",
+                marker=dict(size=4),
+                line=dict(color=color, width=2.0, shape="spline"),
+                hovertemplate=f"<b>{t_name}</b><br>%{{x}}<br>RTT: %{{y:.2f}} ms<extra></extra>"
+            ))
+    else:
+        # Single target line
+        t_label = target_name or (distinct_targets[0] if distinct_targets else "RTT")
+        fig.add_trace(go.Scatter(
+            x=valid_df["timestamp"],
+            y=valid_df["rtt_ms"],
+            name="RTT Latency",
+            mode="lines+markers",
+            marker=dict(size=4, color="#06b6d4"),
+            line=dict(color="#06b6d4", width=2.2, shape="spline"),
+            fill="tozeroy",
+            fillcolor="rgba(6, 182, 212, 0.08)",
+            hovertemplate=f"<b>{t_label}</b><br>%{{x}}<br>RTT: %{{y:.2f}} ms<extra></extra>"
+        ))
+
+    fig.update_layout(
+        margin=dict(l=45, r=20, t=25, b=35),
+        height=280,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="x unified" if len(distinct_targets) > 1 else "closest",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=10, color=text_c)
+        ),
+        xaxis=dict(
+            title=dict(text="Timestamp", font=dict(size=11, color=text_c)),
+            showgrid=False,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text="RTT Latency (ms)", font=dict(size=11, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+
+
+def create_packet_loss_chart(df: pd.DataFrame, is_dark: bool = False) -> go.Figure:
+    """
+    Visualizes packet loss rate (%) over rolling windows.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty or "loss_pct" not in df.columns:
+        fig.add_annotation(
+            text="No rolling statistical window records available for packet loss.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    valid_df = df[df["loss_pct"].notna()].copy()
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No packet loss data in window records.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    ts_series = valid_df["end_time"].fillna(valid_df["start_time"])
+    max_loss = float(valid_df["loss_pct"].max())
+
+    fig.add_trace(go.Scatter(
+        x=ts_series,
+        y=valid_df["loss_pct"],
+        name="Packet Loss (%)",
+        mode="lines+markers",
+        marker=dict(size=5, color="#f43f5e"),
+        line=dict(color="#f43f5e", width=2.0, shape="spline"),
+        fill="tozeroy",
+        fillcolor="rgba(244, 63, 94, 0.08)",
+        hovertemplate="<b>%{x}</b><br>Packet Loss: %{y:.1f}%<extra></extra>"
+    ))
+
+    fig.update_layout(
+        margin=dict(l=45, r=15, t=15, b=30),
+        height=230,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="closest",
+        xaxis=dict(
+            title=dict(text="Window Time", font=dict(size=10, color=text_c)),
+            showgrid=False,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text="Loss (%)", font=dict(size=10, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            range=[0, max(5.0, max_loss * 1.15)],
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+
+
+def create_availability_chart(df: pd.DataFrame, is_dark: bool = False) -> go.Figure:
+    """
+    Visualizes network availability (%) over rolling windows with an SLA target benchmark.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty or "availability_pct" not in df.columns:
+        fig.add_annotation(
+            text="No rolling statistical window records available for availability.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    valid_df = df[df["availability_pct"].notna()].copy()
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No availability metrics in window records.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    ts_series = valid_df["end_time"].fillna(valid_df["start_time"])
+    min_avail = float(valid_df["availability_pct"].min())
+
+    fig.add_trace(go.Scatter(
+        x=ts_series,
+        y=valid_df["availability_pct"],
+        name="Availability (%)",
+        mode="lines+markers",
+        marker=dict(size=5, color="#10b981"),
+        line=dict(color="#10b981", width=2.0, shape="spline"),
+        fill="tozeroy",
+        fillcolor="rgba(16, 185, 129, 0.08)",
+        hovertemplate="<b>%{x}</b><br>Availability: %{y:.1f}%<extra></extra>"
+    ))
+
+    # Add SLA Benchmark line (99%)
+    fig.add_hline(
+        y=99.0,
+        line_dash="dot",
+        line_color="#059669",
+        line_width=1.2,
+        annotation_text="99% SLA",
+        annotation_position="bottom right",
+        annotation_font=dict(size=9, color="#059669")
+    )
+
+    fig.update_layout(
+        margin=dict(l=45, r=15, t=15, b=30),
+        height=230,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="closest",
+        xaxis=dict(
+            title=dict(text="Window Time", font=dict(size=10, color=text_c)),
+            showgrid=False,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text="Availability (%)", font=dict(size=10, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            range=[min(85.0, min_avail - 2.0), 101.0],
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+
+
+def create_jitter_chart(df: pd.DataFrame, is_dark: bool = False) -> go.Figure:
+    """
+    Visualizes statistical jitter (ms) over rolling windows.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty or "jitter_ms" not in df.columns:
+        fig.add_annotation(
+            text="No rolling statistical window records available for jitter.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    valid_df = df[df["jitter_ms"].notna()].copy()
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No jitter metrics recorded in window records.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    ts_series = valid_df["end_time"].fillna(valid_df["start_time"])
+    max_jitter = float(valid_df["jitter_ms"].max())
+
+    fig.add_trace(go.Scatter(
+        x=ts_series,
+        y=valid_df["jitter_ms"],
+        name="Jitter (ms)",
+        mode="lines+markers",
+        marker=dict(size=5, color="#8b5cf6"),
+        line=dict(color="#8b5cf6", width=2.0, shape="spline"),
+        fill="tozeroy",
+        fillcolor="rgba(139, 92, 246, 0.08)",
+        hovertemplate="<b>%{x}</b><br>Jitter: %{y:.2f} ms<extra></extra>"
+    ))
+
+    fig.update_layout(
+        margin=dict(l=45, r=15, t=15, b=30),
+        height=230,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="closest",
+        xaxis=dict(
+            title=dict(text="Window Time", font=dict(size=10, color=text_c)),
+            showgrid=False,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text="Jitter (ms)", font=dict(size=10, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            range=[0, max(5.0, max_jitter * 1.2)],
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+
+
+def create_p95_p99_comparison_chart(df: pd.DataFrame, is_dark: bool = False) -> go.Figure:
+    """
+    Compares P95 vs P99 percentile latencies across measurement windows.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty or ("p95_ms" not in df.columns and "p99_ms" not in df.columns):
+        fig.add_annotation(
+            text="No rolling statistical window records available for P95/P99 latency.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    valid_df = df[df["p95_ms"].notna() | df["p99_ms"].notna()].copy()
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No percentile latency metrics recorded in window records.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=230, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    ts_series = valid_df["end_time"].fillna(valid_df["start_time"])
+
+    # P95 trace
+    if "p95_ms" in valid_df.columns:
+        fig.add_trace(go.Scatter(
+            x=ts_series,
+            y=valid_df["p95_ms"],
+            name="P95 Latency",
+            mode="lines+markers",
+            marker=dict(size=4, color="#f59e0b"),
+            line=dict(color="#f59e0b", width=2.0, shape="spline"),
+            hovertemplate="P95: %{y:.1f} ms"
+        ))
+
+    # P99 trace
+    if "p99_ms" in valid_df.columns:
+        fig.add_trace(go.Scatter(
+            x=ts_series,
+            y=valid_df["p99_ms"],
+            name="P99 Latency",
+            mode="lines+markers",
+            marker=dict(size=4, color="#f43f5e"),
+            line=dict(color="#f43f5e", width=2.0, dash="dash", shape="spline"),
+            hovertemplate="P99: %{y:.1f} ms"
+        ))
+
+    fig.update_layout(
+        margin=dict(l=45, r=15, t=25, b=30),
+        height=230,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="x unified",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=10, color=text_c)
+        ),
+        xaxis=dict(
+            title=dict(text="Window Time", font=dict(size=10, color=text_c)),
+            showgrid=False,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text="Latency (ms)", font=dict(size=10, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+
+
 import textwrap
 
 def clean_html(text: str) -> str:
@@ -552,36 +1195,57 @@ def clean_html(text: str) -> str:
 # --- Bottom Grid: Top Targets by Latency Progress Bars ---
 
 def render_latency_progress_bars(targets: List[Dict[str, Any]]) -> str:
+    if not targets:
+        return '<div style="text-align:center; padding:1rem; color:var(--text-secondary); font-size:0.825rem;">No monitored targets registered.</div>'
     rows = []
     max_ms = 60.0
 
     for t in targets:
         name = t.get("name", "Target")
-        rtt = t.get("rtt_ms", 0.0)
-        pct = min(100.0, (rtt / max_ms) * 100) if max_ms > 0 else 0
+        rtt = t.get("rtt_ms")
+        if rtt is not None and rtt > 0:
+            pct = min(100.0, (rtt / max_ms) * 100) if max_ms > 0 else 0
+            val_tag = f"{int(round(rtt))} ms"
+        else:
+            pct = 0.0
+            val_tag = "N/A"
         icon = get_brand_icon(name)
 
         row = (
             f'<div class="latency-bar-row">'
             f'<div class="latency-logo-group">{icon}<span class="latency-host-title">{name}</span></div>'
             f'<div class="latency-track"><div class="latency-fill" style="width: {pct:.1f}%;"></div></div>'
-            f'<span class="latency-value-tag">{int(round(rtt))} ms</span>'
+            f'<span class="latency-value-tag">{val_tag}</span>'
             f'</div>'
         )
         rows.append(row)
-    return clean_html("\n".join(rows))
+    res = clean_html("\n".join(rows))
+    if not res or not res.strip():
+        return '<div style="text-align:center; padding:1rem; color:var(--text-secondary); font-size:0.825rem;">No monitored targets registered.</div>'
+    return res
 
 # --- Column 2: Live Target Status Card ---
 
 def render_live_target_status_list(targets: List[Dict[str, Any]]) -> str:
+    if not targets:
+        return '<div style="text-align:center; padding:1rem; color:var(--text-secondary); font-size:0.825rem;">No targets configured.</div>'
     rows = []
     for t in targets:
         name = t.get("name", "Host")
         ip = t.get("resolved_ip") or t.get("host")
-        rtt = t.get("rtt_ms", 0.0)
+        rtt = t.get("rtt_ms")
+        rtt_str = f"{int(round(rtt))} ms" if rtt is not None else "N/A"
         loss = t.get("loss_pct", 0.0)
+        avail = t.get("availability_pct", round(100.0 - loss, 1))
         status = t.get("status", "Online")
-        badge_cls = "badge-online" if status == "Online" else ("badge-degraded" if status == "Degraded" else "badge-offline")
+        if status == "Online":
+            badge_cls = "badge-online"
+        elif status == "Degraded":
+            badge_cls = "badge-degraded"
+        elif status == "Unknown":
+            badge_cls = "badge-unknown"
+        else:
+            badge_cls = "badge-offline"
         icon = get_brand_icon(name)
 
         row = (
@@ -591,18 +1255,24 @@ def render_live_target_status_list(targets: List[Dict[str, Any]]) -> str:
             f'<div class="target-name-ip"><span class="target-name">{name}</span><span class="target-ip">{ip}</span></div>'
             f'</div>'
             f'<div class="target-metric-capsule">'
-            f'<div class="metric-label-val"><span class="metric-lbl">RTT</span><span class="metric-v">{int(round(rtt))} ms</span></div>'
+            f'<div class="metric-label-val"><span class="metric-lbl">RTT</span><span class="metric-v">{rtt_str}</span></div>'
             f'<div class="metric-label-val"><span class="metric-lbl">Loss</span><span class="metric-v">{loss:.1f}%</span></div>'
+            f'<div class="metric-label-val"><span class="metric-lbl">Avail</span><span class="metric-v">{avail:.0f}%</span></div>'
             f'<span class="badge-status {badge_cls}">{status}</span>'
             f'</div>'
             f'</div>'
         )
         rows.append(row)
-    return clean_html("\n".join(rows))
+    res = clean_html("\n".join(rows))
+    if not res or not res.strip():
+        return '<div style="text-align:center; padding:1rem; color:var(--text-secondary); font-size:0.825rem;">No targets configured.</div>'
+    return res
 
 # --- Column 2: Active Alerts Card ---
 
 def render_active_alerts_list(anomalies: List[Dict[str, Any]]) -> str:
+    if not anomalies:
+        return '<div style="text-align:center; padding:1rem; color:#10b981; font-size:0.825rem;">✅ All systems nominal. 0 active alerts.</div>'
     rows = []
     for a in anomalies:
         name = a.get("name") or a.get("target_id") or "Target"
@@ -630,11 +1300,21 @@ def render_active_alerts_list(anomalies: List[Dict[str, Any]]) -> str:
             f'</div>'
         )
         rows.append(row)
-    return clean_html("\n".join(rows))
+    res = clean_html("\n".join(rows))
+    if not res or not res.strip():
+        return '<div style="text-align:center; padding:1rem; color:#10b981; font-size:0.825rem;">✅ All systems nominal. 0 active alerts.</div>'
+    return res
 
 # --- Column 2: Recent Activity Micro Table ---
 
 def render_recent_activity_rows(measurements: List[Dict[str, Any]]) -> str:
+    if not measurements:
+        return (
+            '<div style="text-align:center; padding:1.25rem 0.5rem; color:var(--text-secondary); font-size:0.825rem;">'
+            'No recent activity recorded.<br><span style="font-size:0.75rem; color:var(--text-muted);">'
+            'Start monitoring or click Probe All Targets to record new activity.'
+            '</span></div>'
+        )
     rows = []
     for m in measurements:
         ts = m.get("timestamp", "")
@@ -645,8 +1325,9 @@ def render_recent_activity_rows(measurements: List[Dict[str, Any]]) -> str:
             time_str = "11:42"
 
         name = m.get("name") or m.get("target_id") or "Target"
-        rtt = m.get("rtt_ms") or 0.0
+        rtt = m.get("rtt_ms")
         success = m.get("success", 1)
+        rtt_str = f"{int(round(rtt))} ms" if (rtt is not None and success) else "N/A"
         loss = "0.0%" if success else "100.0%"
         dot_color = "#10b981" if success else "#ef4444"
 
@@ -654,10 +1335,263 @@ def render_recent_activity_rows(measurements: List[Dict[str, Any]]) -> str:
             f'<div class="activity-row">'
             f'<span class="activity-time">{time_str}</span>'
             f'<span class="activity-name">{name}</span>'
-            f'<span class="activity-rtt">{int(round(rtt))} ms</span>'
+            f'<span class="activity-rtt">{rtt_str}</span>'
             f'<span class="activity-loss">{loss}</span>'
             f'<div class="activity-status-dot" style="background-color: {dot_color};"></div>'
             f'</div>'
         )
         rows.append(row)
-    return clean_html("\n".join(rows))
+    res = clean_html("\n".join(rows))
+    if not res or not res.strip():
+        return (
+            '<div style="text-align:center; padding:1.25rem 0.5rem; color:var(--text-secondary); font-size:0.825rem;">'
+            'No recent activity recorded.<br><span style="font-size:0.75rem; color:var(--text-muted);">'
+            'Start monitoring or click Probe All Targets to record new activity.'
+            '</span></div>'
+        )
+    return res
+
+
+# --- Anomaly Timeline Visualization ---
+
+def fetch_anomaly_records(
+    target_id: Optional[Any] = None,
+    metric: Optional[str] = None,
+    db_path: str = DEFAULT_DB_PATH
+) -> pd.DataFrame:
+    """
+    Safely reads anomaly records from the SQLite database joined with targets.
+    Maps target IDs/names to actual targets (name, host, resolved_ip).
+    Filters by target_id and metric when specified.
+    Handles missing values and invalid timestamps safely.
+    """
+    from database.db import get_connection
+    query = """
+    SELECT 
+        a.id,
+        a.timestamp,
+        a.target_id,
+        COALESCE(t.name, CASE WHEN a.target_id IS NOT NULL AND a.target_id != '' THEN 'Target #' || a.target_id ELSE 'Unknown Target' END) AS target_name,
+        COALESCE(t.host, t.resolved_ip, '') AS target_host,
+        t.resolved_ip,
+        a.metric,
+        a.observed_value,
+        a.baseline,
+        a.threshold,
+        a.reason
+    FROM anomalies a
+    LEFT JOIN targets t ON (
+        a.target_id = t.target_id 
+        OR a.target_id = CAST(t.target_id AS TEXT) 
+        OR a.target_id = t.name 
+        OR a.target_id = t.host
+    )
+    """
+    conditions = []
+    params = []
+
+    if target_id is not None and str(target_id).strip().lower() not in ("all", "none", ""):
+        conditions.append("(a.target_id = ? OR a.target_id = ? OR t.name = ? OR t.host = ?)")
+        params.extend([str(target_id), target_id, str(target_id), str(target_id)])
+
+    if metric is not None and str(metric).strip().lower() not in ("all", "none", ""):
+        conditions.append("a.metric = ?")
+        params.append(str(metric).strip())
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY a.timestamp ASC, a.id ASC"
+
+    with get_connection(db_path) as conn:
+        c = getattr(conn, "_conn", conn)
+        df = pd.read_sql_query(query, c, params=params if params else None)
+
+    if df.empty:
+        return df
+
+    # Safe timestamp parsing
+    df["parsed_timestamp"] = pd.to_datetime(df["timestamp"], format="mixed", errors="coerce")
+    
+    # Fill missing optional text fields safely
+    df["target_name"] = df["target_name"].fillna("Unknown Target")
+    df["target_host"] = df["target_host"].fillna("")
+    df["metric"] = df["metric"].fillna("unknown")
+    df["reason"] = df["reason"].fillna("Threshold breach detected")
+
+    return df
+
+
+def create_anomaly_timeline_chart(
+    df: pd.DataFrame, 
+    is_dark: bool = False,
+    view_mode: str = "magnitude"
+) -> go.Figure:
+    """
+    Creates an interactive Plotly timeline chart for autonomous anomaly detection events.
+    X-axis: anomaly timestamp
+    Grouped and colored by metric (e.g. loss_pct, p95_ms, jitter_ms, timeout).
+    Supports view_mode='magnitude' (Y = observed value) or 'swimlane' (Y = target name).
+    Includes rich hover details (target name/IP, metric, observed, threshold, baseline, reason).
+    Safely handles empty datasets and missing fields without exceptions.
+    """
+    fig = go.Figure()
+    bg_c = "#111827" if is_dark else "#ffffff"
+    grid_c = "rgba(255, 255, 255, 0.08)" if is_dark else "#f1f5f9"
+    text_c = "#94a3b8" if is_dark else "#64748b"
+
+    if df.empty or "metric" not in df.columns:
+        fig.add_annotation(
+            text="No anomaly records found matching the active filter criteria.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=280, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    # Filter out rows with unparseable timestamps
+    valid_df = df.copy()
+    if "parsed_timestamp" not in valid_df.columns:
+        valid_df["parsed_timestamp"] = pd.to_datetime(valid_df["timestamp"], format="mixed", errors="coerce")
+    
+    valid_df = valid_df[valid_df["parsed_timestamp"].notna()].copy()
+
+    if valid_df.empty:
+        fig.add_annotation(
+            text="No valid timestamped anomaly records available to display.",
+            xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False,
+            font=dict(size=12, color=text_c)
+        )
+        fig.update_layout(
+            paper_bgcolor=bg_c, plot_bgcolor=bg_c,
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            height=280, margin=dict(l=20, r=20, t=25, b=20)
+        )
+        return fig
+
+    # Metric metadata configuration
+    metric_meta = {
+        "loss_pct": {"label": "Packet Loss (loss_pct)", "unit": "%", "color": "#f43f5e", "symbol": "circle"},
+        "p95_ms": {"label": "P95 Latency (p95_ms)", "unit": "ms", "color": "#f59e0b", "symbol": "diamond"},
+        "jitter_ms": {"label": "Jitter (jitter_ms)", "unit": "ms", "color": "#8b5cf6", "symbol": "square"},
+        "timeout": {"label": "Probe Timeout (timeout)", "unit": "sec", "color": "#ef4444", "symbol": "triangle-up"},
+        "rtt": {"label": "RTT Latency (rtt)", "unit": "ms", "color": "#06b6d4", "symbol": "circle-open"}
+    }
+    fallback_colors = ["#ec4899", "#14b8a6", "#3b82f6", "#6366f1", "#10b981", "#d97706"]
+
+    distinct_metrics = valid_df["metric"].dropna().unique().tolist()
+    is_swimlane = (view_mode == "swimlane")
+
+    for idx, metric_key in enumerate(distinct_metrics):
+        sub_df = valid_df[valid_df["metric"] == metric_key].copy()
+        if sub_df.empty:
+            continue
+
+        meta = metric_meta.get(metric_key, {
+            "label": f"{str(metric_key).replace('_', ' ').title()} ({metric_key})",
+            "unit": "ms" if ("ms" in str(metric_key).lower() or "rtt" in str(metric_key).lower()) else (
+                "%" if ("pct" in str(metric_key).lower() or "loss" in str(metric_key).lower()) else ""
+            ),
+            "color": fallback_colors[idx % len(fallback_colors)],
+            "symbol": "circle"
+        })
+
+        unit = meta["unit"]
+        label = meta["label"]
+        color = meta["color"]
+        symbol = meta["symbol"]
+
+        # Build customdata array for rich hover
+        customdata_rows = []
+        for _, row in sub_df.iterrows():
+            t_name = str(row.get("target_name") or "Unknown Target")
+            host_val = row.get("target_host") or row.get("resolved_ip") or "N/A"
+            host_str = str(host_val) if str(host_val).strip() else "N/A"
+            
+            obs_val = row.get("observed_value")
+            obs_str = f"{float(obs_val):.2f}".rstrip("0").rstrip(".") if pd.notna(obs_val) else "0"
+            
+            thresh_val = row.get("threshold")
+            thresh_str = f"{float(thresh_val):.2f}".rstrip("0").rstrip(".") if pd.notna(thresh_val) else "N/A"
+            
+            base_val = row.get("baseline")
+            base_str = f"{float(base_val):.2f}".rstrip("0").rstrip(".") if pd.notna(base_val) else "N/A"
+            
+            reason_str = str(row.get("reason") or "Threshold breach")
+            
+            customdata_rows.append([t_name, host_str, label, unit, obs_str, thresh_str, base_str, reason_str])
+
+        y_data = sub_df["target_name"] if is_swimlane else sub_df["observed_value"].fillna(0.0)
+
+        hovertemplate = (
+            "<b>%{customdata[0]}</b> (%{customdata[1]})<br>"
+            "<b>Metric:</b> %{customdata[2]}<br>"
+            "<b>Observed Value:</b> %{customdata[4]} %{customdata[3]}<br>"
+            "<b>Threshold:</b> %{customdata[5]} %{customdata[3]}<br>"
+            "<b>Baseline:</b> %{customdata[6]} %{customdata[3]}<br>"
+            "<b>Reason:</b> %{customdata[7]}<br>"
+            "<b>Timestamp:</b> %{x|%Y-%m-%d %H:%M:%S}<extra></extra>"
+        )
+
+        trace_name = f"{label} ({len(sub_df)})"
+
+        fig.add_trace(go.Scatter(
+            x=sub_df["parsed_timestamp"],
+            y=y_data,
+            name=trace_name,
+            mode="markers",
+            marker=dict(
+                size=11,
+                symbol=symbol,
+                color=color,
+                line=dict(width=1.5, color="#ffffff" if is_dark else "#0e2428")
+            ),
+            customdata=customdata_rows,
+            hovertemplate=hovertemplate
+        ))
+
+    # Determine Y-axis title
+    if is_swimlane:
+        y_title = "Monitored Network Targets"
+    elif len(distinct_metrics) == 1:
+        single_meta = metric_meta.get(distinct_metrics[0], {})
+        unit = single_meta.get("unit", "")
+        y_title = f"Observed Value ({unit})" if unit else "Observed Value"
+    else:
+        y_title = "Observed Metric Magnitude"
+
+    fig.update_layout(
+        margin=dict(l=55, r=20, t=30, b=40),
+        height=320,
+        paper_bgcolor=bg_c,
+        plot_bgcolor=bg_c,
+        hovermode="closest",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            font=dict(size=10, color=text_c)
+        ),
+        xaxis=dict(
+            title=dict(text="Anomaly Timestamp", font=dict(size=11, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            tickfont=dict(size=9)
+        ),
+        yaxis=dict(
+            title=dict(text=y_title, font=dict(size=11, color=text_c)),
+            showgrid=True,
+            gridcolor=grid_c,
+            color=text_c,
+            tickfont=dict(size=9)
+        )
+    )
+    return fig
+

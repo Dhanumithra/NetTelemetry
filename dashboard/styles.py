@@ -136,6 +136,12 @@ div[data-testid="stMarkdownContainer"] small {
     border: 1px solid rgba(248, 113, 113, 0.4) !important;
 }
 
+.badge-unknown {
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    border: 1px solid rgba(148, 163, 184, 0.4) !important;
+}
+
 .badge-warning {
     background: #451a03 !important;
     color: #fbbf24 !important;
@@ -366,13 +372,15 @@ div[data-testid="stNumberInput"] div[data-baseweb="input"] {
     border: 1px solid #334155 !important;
 }
 
-/* Auto-adapt SVG icon strokes to crisp white */
-svg path[stroke="#0e2428"],
-svg circle[stroke="#0e2428"],
-svg line[stroke="#0e2428"],
-svg polyline[stroke="#0e2428"],
-svg rect[stroke="#0e2428"] {
-    stroke: #f8fafc !important;
+/* Dialog / Modal Dark Mode */
+div[data-testid="stDialog"] > div {
+    background-color: #111827 !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    color: #f8fafc !important;
+}
+
+div[data-testid="stDialog"] h2 {
+    color: #ffffff !important;
 }
 </style>
 """
@@ -485,153 +493,459 @@ div[data-testid="stHorizontalBlock"]:first-child {
     z-index: 999 !important;
 }
 
-/* Sidebar styling - Deep Teal matching mockup */
+/* =========================================================
+   NETTELEMETRY SIDEBAR DESIGN SYSTEM (Production SaaS)
+   ========================================================= */
+
+/* Sidebar Base Canvas - Deep Blue-Green #0B1F24 */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0e2428 0%, #091a1d 100%) !important;
-    color: #e2e8f0 !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
-    padding-top: 0.5rem !important;
+    background: #0B1F24 !important;
+    background-color: #0B1F24 !important;
+    color: #F1F5F9 !important;
+    border-right: 1px solid rgba(20, 184, 166, 0.15) !important;
+    padding-top: 0.6rem !important;
 }
 
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-    gap: 0.5rem !important;
+    gap: 0.35rem !important;
 }
 
-/* Sidebar Brand Header */
+/* Force High-Contrast Readable Text for all elements inside Sidebar */
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] div[data-testid="stText"] {
+    color: #F1F5F9 !important;
+}
+
+/* Brand Header */
+[data-testid="stSidebar"] .sidebar-brand-container,
 .sidebar-brand-container {
-    padding: 1rem 0.5rem 1.25rem 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: 1rem;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+    padding: 0.35rem 0.25rem 0.5rem 0.25rem !important;
 }
 
-.brand-icon-wrapper {
-    width: 36px;
-    height: 36px;
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 8px;
+[data-testid="stSidebar"] .brand-logo-symbol,
+.brand-logo-symbol {
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+    display: inline-block !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    border-radius: 9px !important;
+    background-color: #0D2E32 !important;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2736%27%20height%3D%2736%27%20viewBox%3D%270%200%2036%2036%27%20fill%3D%27none%27%3E%20%3Crect%20width%3D%2736%27%20height%3D%2736%27%20rx%3D%279%27%20fill%3D%27%230D2E32%27%20stroke%3D%27%2314B8A6%27%20stroke-width%3D%271.5%27/%3E%20%3Cline%20x1%3D%275%27%20y1%3D%2718%27%20x2%3D%2731%27%20y2%3D%2718%27%20stroke%3D%27%23134E4A%27%20stroke-width%3D%271.2%27%20stroke-dasharray%3D%272%202%27/%3E%20%3Cpolyline%20points%3D%276%2C18%2010%2C18%2014%2C9%2018.5%2C27%2023%2C12%2026.5%2C18%2030%2C18%27%20fill%3D%27none%27%20stroke%3D%27%232DD4BF%27%20stroke-width%3D%272.2%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27/%3E%20%3Ccircle%20cx%3D%2714%27%20cy%3D%279%27%20r%3D%272.4%27%20fill%3D%27%2314B8A6%27%20stroke%3D%27%230B1F24%27%20stroke-width%3D%271.4%27/%3E%20%3Ccircle%20cx%3D%2718.5%27%20cy%3D%2727%27%20r%3D%272.4%27%20fill%3D%27%2310B981%27%20stroke%3D%27%230B1F24%27%20stroke-width%3D%271.4%27/%3E%20%3Ccircle%20cx%3D%2723%27%20cy%3D%2712%27%20r%3D%272%27%20fill%3D%27%2334D399%27%20stroke%3D%27%230B1F24%27%20stroke-width%3D%271.2%27/%3E%20%3C/svg%3E") !important;
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    box-shadow: 0 2px 10px rgba(20, 184, 166, 0.28) !important;
+    flex-shrink: 0 !important;
+}
+
+.brand-text-block {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
-    color: #10b981;
+    line-height: 1.15;
 }
 
+[data-testid="stSidebar"] .brand-title,
 .brand-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #ffffff;
-    letter-spacing: -0.02em;
+    font-size: 1.18rem !important;
+    font-weight: 800 !important;
+    color: #FFFFFF !important;
+    letter-spacing: -0.02em !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+}
+
+[data-testid="stSidebar"] .brand-subtitle,
+.brand-subtitle {
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    color: #94A3B8 !important;
+    letter-spacing: 0.025em !important;
+    margin-top: 2px !important;
+}
+
+/* Refined Dark Teal Dividers */
+.sidebar-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid rgba(20, 184, 166, 0.12);
+    margin: 0.65rem 0 0.75rem 0;
+}
+
+/* =========================================================
+   PRIMARY SIDEBAR NAVIGATION BUTTONS
+   ========================================================= */
+
+/* Force consistent layout and dimensions */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] {
+    margin-bottom: 2px !important;
+    width: 100% !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 0.55rem 0.85rem !important;
+    border-radius: 8px !important;
+    font-size: 0.875rem !important;
+    letter-spacing: 0.01em !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+/* Ensure inner label wrapper is strictly left aligned next to icon */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button > div,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button div[data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    flex: 1 1 auto !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button div[data-testid="stMarkdownContainer"] p {
+    text-align: left !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+}
+
+/* Inactive Navigation Item */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-secondary"],
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button:not([data-testid="stBaseButton-primary"]) {
+    background: transparent !important;
+    background-color: transparent !important;
+    color: #E2E8F0 !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-secondary"] p,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button:not([data-testid="stBaseButton-primary"]) p {
+    color: #E2E8F0 !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+
+/* Inactive Hover State */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-secondary"]:hover,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button:not([data-testid="stBaseButton-primary"]):hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    background-color: rgba(255, 255, 255, 0.07) !important;
+    color: #FFFFFF !important;
+    border-color: rgba(20, 184, 166, 0.2) !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-secondary"]:hover p,
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button:not([data-testid="stBaseButton-primary"]):hover p {
+    color: #FFFFFF !important;
+}
+
+/* Active Navigation Item - Subtle Teal Surface #0F766E */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-primary"] {
+    background: #0F766E !important;
+    background-color: #0F766E !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(20, 184, 166, 0.55) !important;
+    font-weight: 600 !important;
+    box-shadow: inset 3px 0 0 0 #14B8A6, 0 2px 8px rgba(15, 118, 110, 0.35) !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-primary"] p {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-primary"]:hover {
+    background: #115E59 !important;
+    background-color: #115E59 !important;
+    border-color: #14B8A6 !important;
+    color: #FFFFFF !important;
+}
+
+/* Lucide Vector Icons via CSS Mask */
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button::before {
+    content: "";
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    background-color: #94A3B8;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    transition: background-color 0.15s ease;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button:hover::before {
+    background-color: #FFFFFF;
+}
+
+[data-testid="stSidebar"] div[class*="st-key-sidebar_nav_"] button[data-testid="stBaseButton-primary"]::before {
+    background-color: #FFFFFF;
+}
+
+/* Individual Lucide Icon Definitions */
+.st-key-sidebar_nav_Dashboard button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='9' x='3' y='3' rx='1'/%3E%3Crect width='7' height='5' x='14' y='3' rx='1'/%3E%3Crect width='7' height='9' x='14' y='12' rx='1'/%3E%3Crect width='7' height='5' x='3' y='16' rx='1'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='7' height='9' x='3' y='3' rx='1'/%3E%3Crect width='7' height='5' x='14' y='3' rx='1'/%3E%3Crect width='7' height='9' x='14' y='12' rx='1'/%3E%3Crect width='7' height='5' x='3' y='16' rx='1'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Targets button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Measurements button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='20' x2='18' y2='10'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='6' y1='20' x2='6' y2='14'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='20' x2='18' y2='10'/%3E%3Cline x1='12' y1='20' x2='12' y2='4'/%3E%3Cline x1='6' y1='20' x2='6' y2='14'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Analytics button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='23 6 13.5 15.5 8.5 10.5 1 18'/%3E%3Cpolyline points='17 6 23 6 23 12'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='23 6 13.5 15.5 8.5 10.5 1 18'/%3E%3Cpolyline points='17 6 23 6 23 12'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Alerts button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/%3E%3Cpath d='M13.73 21a2 2 0 0 1-3.46 0'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/%3E%3Cpath d='M13.73 21a2 2 0 0 1-3.46 0'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Reports button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3Cline x1='16' y1='13' x2='8' y2='13'/%3E%3Cline x1='16' y1='17' x2='8' y2='17'/%3E%3C/svg%3E");
+}
+
+.st-key-sidebar_nav_Settings button::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'/%3E%3C/svg%3E");
+}
+
+/* =========================================================
+   TELEMETRY ENGINE SECTION
+   ========================================================= */
+
+[data-testid="stSidebar"] .sidebar-section-header,
+.sidebar-section-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: #94A3B8 !important;
+    margin-bottom: 0.45rem !important;
+    padding: 0 0.2rem !important;
+}
+
+
+
+/* Telemetry Live Status Card */
+.telemetry-live-card {
+    background: rgba(14, 37, 43, 0.85);
+    border: 1px solid rgba(20, 184, 166, 0.25);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.45rem;
+}
+
+.telemetry-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-dot-active {
+    background-color: #10B981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulse-green 2s infinite;
+}
+
+.status-dot-paused {
+    background-color: #94A3B8;
+}
+
+.telemetry-live-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #FFFFFF;
     line-height: 1.2;
 }
 
-.brand-subtitle {
-    font-size: 0.7rem;
-    color: #7ba2a8;
-    font-weight: 500;
-    letter-spacing: 0.03em;
+.telemetry-live-sub {
+    font-size: 0.68rem;
+    color: #94A3B8;
 }
 
-/* Sidebar Nav Items */
-.nav-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.65rem 0.85rem;
-    border-radius: 8px;
-    color: #94a3b8;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.15s ease-in-out;
-    margin-bottom: 0.25rem;
-    text-decoration: none;
-    cursor: pointer;
+/* Telemetry Actions */
+[data-testid="stSidebar"] div.st-key-sidebar_probe_all {
+    margin-top: 0.35rem !important;
+    margin-bottom: 0.35rem !important;
+    width: 100% !important;
 }
 
-.nav-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #f8fafc;
+[data-testid="stSidebar"] div.st-key-sidebar_probe_all button {
+    background: #0D9488 !important;
+    background-color: #0D9488 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #14B8A6 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.825rem !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0.4rem 0.75rem !important;
+    box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    width: 100% !important;
 }
 
-.nav-item.active {
-    background: #17373c !important;
-    color: #ffffff !important;
-    font-weight: 600;
-    box-shadow: inset 3px 0 0 0 #10b981;
+[data-testid="stSidebar"] div.st-key-sidebar_probe_all button p {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
 }
 
-.nav-icon-label {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+[data-testid="stSidebar"] div.st-key-sidebar_probe_all button:hover {
+    background: #14B8A6 !important;
+    background-color: #14B8A6 !important;
+    border-color: #2DD4BF !important;
+    box-shadow: 0 3px 10px rgba(20, 184, 166, 0.45) !important;
 }
 
-.nav-badge-red {
-    background: #ef4444;
-    color: #ffffff;
-    font-size: 0.7rem;
-    font-weight: 700;
-    border-radius: 9999px;
-    padding: 2px 7px;
-    line-height: 1;
+[data-testid="stSidebar"] div.st-key-sidebar_refresh_data {
+    margin-bottom: 0.35rem !important;
+    width: 100% !important;
 }
 
-/* Sidebar bottom status & wave */
+[data-testid="stSidebar"] div.st-key-sidebar_refresh_data button {
+    background: rgba(255, 255, 255, 0.04) !important;
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #CBD5E1 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    font-size: 0.825rem !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 0.4rem 0.75rem !important;
+    box-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+}
+
+[data-testid="stSidebar"] div.st-key-sidebar_refresh_data button p {
+    color: #CBD5E1 !important;
+    font-weight: 500 !important;
+    margin: 0 !important;
+}
+
+[data-testid="stSidebar"] div.st-key-sidebar_refresh_data button:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #FFFFFF !important;
+    border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Sidebar Toggle & Select Input Styling */
+[data-testid="stSidebar"] div[data-testid="stCheckbox"] label p {
+    color: #E2E8F0 !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+}
+
+[data-testid="stSidebar"] div[data-testid="stSelectbox"] label p {
+    color: #94A3B8 !important;
+    font-size: 0.725rem !important;
+}
+
+[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background-color: #0E2A30 !important;
+    border: 1px solid rgba(20, 184, 166, 0.25) !important;
+    color: #FFFFFF !important;
+    border-radius: 8px !important;
+}
+
+[data-testid="stSidebar"] div[data-baseweb="select"] span {
+    color: #E2E8F0 !important;
+}
+
+/* Bottom Soundwave & Status Card */
 .sidebar-bottom-container {
-    margin-top: 2rem;
-    padding-top: 1rem;
+    margin-top: 0.85rem;
+    padding-top: 0.35rem;
     position: relative;
 }
 
 .sidebar-status-card {
-    background: rgba(14, 45, 50, 0.85);
+    background: rgba(14, 37, 43, 0.85);
     border: 1px solid rgba(16, 185, 129, 0.25);
-    border-radius: 10px;
-    padding: 0.75rem 0.85rem;
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
 }
 
 .status-dot-pulse {
-    width: 10px;
-    height: 10px;
-    background-color: #10b981;
+    width: 9px;
+    height: 9px;
+    background-color: #10B981;
     border-radius: 50%;
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
     animation: pulse-green 2s infinite;
 }
 
-@keyframes pulse-green {
-    0% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
-}
-
 .status-text-title {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 600;
-    color: #ffffff;
+    color: #FFFFFF;
     line-height: 1.2;
 }
 
 .status-text-sub {
-    font-size: 0.7rem;
-    color: #7ba2a8;
+    font-size: 0.68rem;
+    color: #94A3B8;
 }
 
 .sidebar-footer-version {
-    font-size: 0.7rem;
-    color: #52757a;
+    font-size: 0.68rem;
+    color: #64748B;
     padding-left: 0.25rem;
 }
 
@@ -1056,6 +1370,12 @@ div[data-testid="stTextInput"] input::placeholder {
 .badge-offline {
     background: #fee2e2;
     color: #dc2626;
+}
+
+.badge-unknown {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #cbd5e1;
 }
 
 .badge-critical {
@@ -1615,6 +1935,19 @@ div[data-testid="stPopoverBody"] button:hover {
 div[data-baseweb="popover"] hr,
 div[data-testid="stPopoverBody"] hr {
     border-color: #e2e8f0 !important;
+}
+
+/* Dialog / Modal Confirmation Styling */
+div[data-testid="stDialog"] > div {
+    border-radius: 12px !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+}
+
+div[data-testid="stDialog"] h2 {
+    font-weight: 700 !important;
+    font-size: 1.25rem !important;
+    color: var(--text-primary) !important;
 }
 </style>
 """

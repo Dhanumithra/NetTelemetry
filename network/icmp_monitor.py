@@ -169,7 +169,7 @@ def ping_target(host: str, timeout_sec: int = 2) -> Dict[str, Any]:
     Performs an ICMP ping observation to the destination host.
     Uses Win32 ICMP API and falls back to system ping utility if necessary.
     """
-    # Try ctypes ping first if IP address
+    # Try ctypes ping first using resolved IP
     try:
         resolved_ip = socket.gethostbyname(host)
         res = ping(resolved_ip, timeout_ms=int(timeout_sec * 1000))
@@ -180,6 +180,8 @@ def ping_target(host: str, timeout_sec: int = 2) -> Dict[str, Any]:
                 "ttl": res.get("ttl"),
                 "error": None
             }
+    except socket.gaierror:
+        return {"success": False, "rtt_ms": None, "ttl": None, "error": f"DNS resolution failed for '{host}'"}
     except Exception:
         pass
 
